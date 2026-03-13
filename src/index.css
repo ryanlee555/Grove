@@ -1,2 +1,8 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Remove focus outlines from Recharts SVG elements */
+svg:focus,
+svg *:focus {
+  outline: none;
+}

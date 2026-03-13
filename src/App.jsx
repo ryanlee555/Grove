@@ -1,7 +1,10 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react'
+import * as THREE from 'three'
+import BIRDS from 'vanta/src/vanta.birds'
 import {
   PieChart, Pie, Cell, Sector, Tooltip,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line,
 } from 'recharts'
 import { Moon, Sun, ChevronDown, X, Plus } from 'lucide-react'
 import unlimitedRaw from './data/unlimited.CSV?raw'
@@ -20,7 +23,11 @@ const COLORS = {
   'Nightlife':         '#f43f5e',
   'Miscellaneous':     '#6b7280',
 }
-const CATEGORIES  = Object.keys(COLORS)
+const CATEGORIES   = Object.keys(COLORS)
+const CARD_OPTIONS = ['Chase Unlimited', 'Chase Flex', 'Other']
+
+let _txId = 0
+const nextId = () => ++_txId
 
 const PRESETS = [
   { id: 'this-month', label: 'This Month'   },
@@ -60,6 +67,44 @@ function formatRangeLabel(preset, start, end) {
     return start.toLocaleDateString('en-US', { month:'long', year:'numeric' })
   const fmt = d => d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
   return `${fmt(start)} – ${fmt(end)}`
+}
+
+// ─── Weekly/monthly bucket builder (shared by Trends + Compare) ──────────────
+function computeWeeklyBuckets(allTx, rangeStart, rangeEnd) {
+  const purchases = allTx.filter(t => t.amount < 0)
+  const rangeDays = Math.max(1, Math.ceil((rangeEnd - rangeStart) / (1000*60*60*24)) + 1)
+  const buckets = []
+  if (rangeDays <= 62) {
+    let cursor = new Date(rangeStart)
+    while (cursor <= rangeEnd) {
+      const wEnd = new Date(cursor); wEnd.setDate(wEnd.getDate() + 6)
+      const bucketEnd = wEnd > rangeEnd ? new Date(rangeEnd) : wEnd
+      buckets.push({ start: new Date(cursor), end: new Date(bucketEnd),
+        label: cursor.toLocaleDateString('en-US', { month:'short', day:'numeric' }) })
+      cursor.setDate(cursor.getDate() + 7)
+    }
+  } else {
+    let cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1)
+    while (cursor <= rangeEnd) {
+      const mEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0)
+      buckets.push({ start: new Date(cursor), end: new Date(mEnd),
+        label: cursor.toLocaleDateString('en-US', { month:'short', year:'2-digit' }) })
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+  }
+  return buckets.map(b => {
+    const bucketTx = purchases.filter(t => { const d = parseTxDate(t.date); return d >= b.start && d <= b.end })
+    const result = { label: b.label }
+    let total = 0
+    CATEGORIES.forEach(cat => {
+      const v = parseFloat(bucketTx.filter(t => t.category === cat)
+        .reduce((s, t) => s + (isNaN(t.amount) ? 0 : Math.abs(t.amount)), 0).toFixed(2)) || 0
+      result[cat] = v
+      total += v
+    })
+    result.total = parseFloat(total.toFixed(2))
+    return result
+  })
 }
 
 // ─── Keyword category mapping ─────────────────────────────────────────────────
@@ -105,7 +150,7 @@ function decodeEntities(s) {
 // ─── Shared components ────────────────────────────────────────────────────────
 function Card({ title, action, children }) {
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/[0.07] bg-white dark:bg-[#0e0e14]">
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/60 dark:border-white/10 bg-white/15 dark:bg-[#0a1f3d]/25 backdrop-blur-sm">
       <div className="flex items-center justify-between px-6 pt-5 pb-0 shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-300">{title}</span>
         {action}
@@ -118,7 +163,6 @@ function Card({ title, action, children }) {
 function ChartTip({ active, payload }) {
   if (!active || !payload?.length) return null
   const item = payload[0].payload
-  // PieChart items: { name, value }  ·  BarChart items: { label, amount }
   const label = item.name ?? item.label ?? ''
   const value = item.value ?? item.amount ?? payload[0].value ?? 0
   return (
@@ -129,10 +173,328 @@ function ChartTip({ active, payload }) {
   )
 }
 
+// Stacked bar tooltip — total header + per-category breakdown
+function StackedBarTip({ active, payload, label, isWeekly }) {
+  if (!active || !payload?.length) return null
+  const items = payload.filter(p => p.value > 0).slice().reverse()
+  const total = items.reduce((s, p) => s + p.value, 0)
+  const header = isWeekly ? `Week of ${label}` : label
+  return (
+    <div className="rounded-xl px-3 py-2.5 shadow-xl border bg-white dark:bg-[#1a1a24] border-zinc-200 dark:border-white/10 min-w-[195px]">
+      <p className="font-bold text-[13px] text-zinc-900 dark:text-zinc-50 mb-2 leading-tight">
+        {header} <span className="text-indigo-500 dark:text-indigo-400">· ${total.toFixed(2)}</span>
+      </p>
+      <div className="space-y-1">
+        {items.map(p => (
+          <div key={p.dataKey} className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: p.fill }} />
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{p.dataKey}</span>
+            </div>
+            <span className="text-[11px] font-semibold tabular-nums text-zinc-800 dark:text-zinc-200 shrink-0">
+              ${Number(p.value).toFixed(2)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Line chart tooltip — period + $ per series
+function LineTip({ active, payload, label, compareRanges, dateRange, lineColors, hasComparisons }) {
+  if (!active || !payload?.length) return null
+  const visible = payload.filter(p => p.value != null)
+  return (
+    <div className="rounded-xl px-3 py-2.5 shadow-xl border bg-white dark:bg-[#1a1a24] border-zinc-200 dark:border-white/10 min-w-[160px]">
+      <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 mb-1.5">
+        {hasComparisons ? label : `Week of ${label}`}
+      </p>
+      {visible.map(p => {
+        const idx = p.dataKey === 'primary' ? 0 : parseInt(p.dataKey.replace('comp', '')) + 1
+        const periodName = p.dataKey === 'primary'
+          ? formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)
+          : compareRanges[parseInt(p.dataKey.replace('comp', ''))]?.label ?? p.dataKey
+        return (
+          <div key={p.dataKey} className="flex items-center justify-between gap-3 py-0.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="w-3 h-[2px] rounded shrink-0" style={{ backgroundColor: lineColors[idx] }} />
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[90px]">{periodName}</span>
+            </div>
+            <span className="text-[11px] font-bold tabular-nums text-zinc-900 dark:text-zinc-50 shrink-0">
+              ${Number(p.value).toFixed(2)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 const inputCls = 'w-full rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#1a1a24] text-zinc-900 dark:text-zinc-100 text-sm px-3 py-2 outline-none focus:border-indigo-400 dark:focus:border-indigo-500 transition-colors placeholder:text-zinc-400 dark:placeholder:text-zinc-600'
 
+// ─── Inline transaction edit form ─────────────────────────────────────────────
+function TxEditForm({ tx, onSave, onDelete, onCancel }) {
+  const [date,     setDate]     = useState(toInputDate(parseTxDate(tx.date)))
+  const [merchant, setMerchant] = useState(tx.merchant)
+  const [category, setCategory] = useState(tx.category)
+  const [source,   setSource]   = useState(tx.source)
+  const [amount,   setAmount]   = useState(Math.abs(tx.amount).toString())
+
+  const handleSave = (e) => {
+    e.preventDefault()
+    const parsed = parseFloat(amount)
+    if (!date || !merchant.trim() || isNaN(parsed)) return
+    onSave({ date: toTxDateStr(fromInputDate(date)), merchant: merchant.trim(), category, source, amount: -Math.abs(parsed) })
+  }
+
+  return (
+    <form onSubmit={handleSave}
+      className="px-4 py-3 bg-zinc-50 dark:bg-[#0a0a10] border-t border-zinc-100 dark:border-white/[0.05]"
+      onClick={e => e.stopPropagation()}>
+      <div className="grid grid-cols-5 gap-2 mb-2.5">
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
+        <input type="text" value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="Merchant" className={inputCls} />
+        <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={source} onChange={e => setSource(e.target.value)} className={inputCls}>
+          {CARD_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+          placeholder="Amount" step="0.01" min="0" className={inputCls} />
+      </div>
+      <div className="flex items-center gap-2">
+        <button type="submit"
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors">
+          Save
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-white/[0.07] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/[0.12] transition-colors">
+          Cancel
+        </button>
+        <button type="button" onClick={onDelete}
+          className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors">
+          Delete
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── Trends section (Q4) ──────────────────────────────────────────────────────
+const LINE_COLORS_DARK  = ['#a5b4fc', '#34d399', '#fb923c', '#f472b6', '#facc15']
+const LINE_COLORS_LIGHT = ['#4f46e5', '#10b981', '#f97316', '#ec4899', '#ca8a04']
+
+function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
+  const [view,          setView]          = useState('bar')
+  const [compareRanges, setCompareRanges] = useState([])
+  const [compMonthId,   setCompMonthId]   = useState('')
+
+  const lineColors = isDark ? LINE_COLORS_DARK : LINE_COLORS_LIGHT
+  const cg         = isDark ? '#1f1f2e' : '#e4e4e7'
+  const ca         = isDark ? '#71717a' : '#a1a1aa'
+  const cursorFill = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'
+  const isWeekly   = rangeDays <= 62
+
+  // Check whether the current date range is exactly a full calendar month
+  const isFullMonth = useMemo(() => {
+    const { start, end } = dateRange
+    if (start.getDate() !== 1) return false
+    const lastDay = new Date(start.getFullYear(), start.getMonth() + 1, 0)
+    return end.getFullYear() === lastDay.getFullYear() &&
+      end.getMonth() === lastDay.getMonth() &&
+      end.getDate() === lastDay.getDate()
+  }, [dateRange])
+
+  // ID of current month (to exclude from dropdown)
+  const currentMonthId = isFullMonth
+    ? `${dateRange.start.getFullYear()}-${String(dateRange.start.getMonth()+1).padStart(2,'0')}`
+    : null
+
+  // Primary buckets (stacked bar + line primary)
+  const primaryData = useMemo(() =>
+    computeWeeklyBuckets(allTx, dateRange.start, dateRange.end),
+    [allTx, dateRange]
+  )
+
+  const hasComparisons = compareRanges.length > 0
+
+  // Merged line data — uses "Week N" x-labels when comparing so months align
+  const lineData = useMemo(() => {
+    if (view !== 'line') return []
+    const compBuckets = compareRanges.map(cr =>
+      computeWeeklyBuckets(allTx, cr.start, cr.end)
+    )
+    const maxLen = Math.max(primaryData.length, ...compBuckets.map(b => b.length), 0)
+    return Array.from({ length: maxLen }, (_, i) => ({
+      label:   hasComparisons ? `Week ${i + 1}` : (primaryData[i]?.label ?? `W${i+1}`),
+      primary: primaryData[i]?.total ?? null,
+      ...Object.fromEntries(compBuckets.map((cb, ci) => [`comp${ci}`, cb[i]?.total ?? null]))
+    }))
+  }, [view, primaryData, compareRanges, allTx, hasComparisons])
+
+  // Available months from transaction data, excluding current month
+  const availableMonths = useMemo(() => {
+    const seen = new Set()
+    allTx.forEach(t => {
+      const d = parseTxDate(t.date)
+      seen.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+    })
+    return [...seen].sort().reverse()
+      .filter(m => m !== currentMonthId)
+      .map(m => {
+        const [y, mo] = m.split('-')
+        return {
+          id: m,
+          label: new Date(+y, +mo-1, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' }),
+          start: new Date(+y, +mo-1, 1),
+          end:   new Date(+y, +mo, 0),
+        }
+      })
+  }, [allTx, currentMonthId])
+
+  const addComparison = (start, end, label) => {
+    const id = `${start.getTime()}-${end.getTime()}`
+    if (compareRanges.find(r => r.id === id) || compareRanges.length >= 4) return
+    setCompareRanges(prev => [...prev, { id, label, start, end }])
+  }
+  const removeComparison = (id) => setCompareRanges(prev => prev.filter(r => r.id !== id))
+
+  const addMonth = (id) => {
+    const m = availableMonths.find(x => x.id === id)
+    if (!m) return
+    addComparison(m.start, m.end, m.label)
+    setCompMonthId('')
+  }
+
+  return (
+    <div className="flex flex-col h-full gap-2">
+
+      {/* Row 1 — subtitle + Bar/Line toggle */}
+      <div className="flex items-center justify-between shrink-0 gap-2">
+        <p className="text-[11px] text-zinc-500 dark:text-zinc-300 truncate">
+          {isWeekly ? 'Weekly' : 'Monthly'} spending — {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
+        </p>
+        <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-white/[0.06] rounded-lg p-0.5 shrink-0">
+          {['bar','line'].map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-colors
+                ${view === v
+                  ? 'bg-white dark:bg-[#1a1a24] text-zinc-800 dark:text-zinc-100 shadow-sm'
+                  : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-400'}`}>
+              {v === 'bar' ? 'Bar' : 'Line'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 2 — Compare controls (line mode only) */}
+      {view === 'line' && (
+        <div className="shrink-0 space-y-1.5">
+          {!isFullMonth ? (
+            <p className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-2.5 py-1.5 leading-snug">
+              Compare is only available for full months. Adjust your date range to a single full month to enable it.
+            </p>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide shrink-0">Compare:</span>
+              <select
+                value={compMonthId}
+                onChange={e => addMonth(e.target.value)}
+                disabled={compareRanges.length >= 4}
+                className="px-2 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#1a1a24] text-[10px] text-zinc-600 dark:text-zinc-300 outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-zinc-50 dark:hover:bg-white/[0.06]">
+                <option value="">Add month…</option>
+                {availableMonths
+                  .filter(m => !compareRanges.find(r => r.id === m.id))
+                  .map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Active comparison pills */}
+          {hasComparisons && (
+            <div className="flex gap-1.5 flex-wrap">
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                style={{ backgroundColor: lineColors[0] + '28', color: lineColors[0] }}>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: lineColors[0] }} />
+                {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
+              </span>
+              {compareRanges.map((cr, i) => (
+                <span key={cr.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                  style={{ backgroundColor: lineColors[i+1] + '28', color: lineColors[i+1] }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: lineColors[i+1] }} />
+                  {cr.label}
+                  <button onClick={() => removeComparison(cr.id)} className="ml-0.5 opacity-60 hover:opacity-100 leading-none">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Chart area */}
+      <div className="flex-1 min-h-0">
+        {view === 'bar' ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={primaryData} margin={{ top:4, right:4, left:-16, bottom: isWeekly ? 14 : 0 }}>
+              <CartesianGrid vertical={false} stroke={cg} strokeDasharray="3 3" />
+              <XAxis dataKey="label" axisLine={false} tickLine={false}
+                tick={{ fill: ca, fontSize: 10 }}
+                label={isWeekly ? { value:'Week of', position:'insideBottom', offset:-2, fill:ca, fontSize:9 } : undefined}
+              />
+              <YAxis tick={{ fill:ca, fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`} />
+              <Tooltip
+                content={(props) => <StackedBarTip {...props} isWeekly={isWeekly} />}
+                cursor={{ fill: cursorFill }}
+              />
+              {CATEGORIES.map(cat => (
+                <Bar key={cat} dataKey={cat} stackId="a" fill={COLORS[cat]} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={lineData} margin={{ top:4, right:4, left:-16, bottom:0 }}>
+              <CartesianGrid vertical={false} stroke={cg} strokeDasharray="3 3" />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill:ca, fontSize:10 }} />
+              <YAxis tick={{ fill:ca, fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`} />
+              <Tooltip
+                content={(props) => <LineTip {...props} compareRanges={compareRanges} dateRange={dateRange} lineColors={lineColors} hasComparisons={hasComparisons} />}
+                cursor={{ stroke: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', strokeWidth:1 }}
+              />
+              <Line dataKey="primary" stroke={lineColors[0]} strokeWidth={2.5} dot={false} connectNulls activeDot={{ r:4, strokeWidth:0 }} />
+              {compareRanges.map((cr, i) => (
+                <Line key={cr.id} dataKey={`comp${i}`} stroke={lineColors[i+1]} strokeWidth={2} dot={false} connectNulls strokeDasharray="5 3" activeDot={{ r:4, strokeWidth:0 }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Line legend (line mode + comparisons active) */}
+      {view === 'line' && hasComparisons && (
+        <div className="shrink-0 flex items-center gap-3 flex-wrap pt-0.5">
+          {[
+            { key:'primary', label: formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end), color: lineColors[0], dashed: false },
+            ...compareRanges.map((cr, i) => ({ key: cr.id, label: cr.label, color: lineColors[i+1], dashed: true })),
+          ].map(({ key, label, color, dashed }) => (
+            <div key={key} className="flex items-center gap-1.5 min-w-0">
+              <svg width="20" height="6" viewBox="0 0 20 6" className="shrink-0">
+                <line x1="0" y1="3" x2="20" y2="3" stroke={color} strokeWidth="2"
+                  strokeDasharray={dashed ? '5 3' : 'none'} strokeLinecap="round" />
+              </svg>
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate max-w-[110px]">{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Spending by Category section (Q2) ───────────────────────────────────────
-function CategorySection({ byCategory, totalSpent, isDark }) {
+function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
   const [hoveredCat, setHoveredCat] = useState(null)
   const [lockedCat,  setLockedCat]  = useState(null)
   const activeCat = lockedCat ?? hoveredCat
@@ -211,14 +573,13 @@ function CategorySection({ byCategory, totalSpent, isDark }) {
                 />
               ))}
             </Pie>
-            <Tooltip content={<ChartTip />} />
           </PieChart>
         </ResponsiveContainer>
 
-        {/* Center label — fades in when a category is active */}
+        {/* Hover label — shown only when hovering (not locked) */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          {activeCatData && (
-            <div className="text-center px-3 max-w-[120px]" style={{ animation: 'fadeIn 0.15s ease' }}>
+          {hoveredCat && !lockedCat && activeCatData && (
+            <div className="text-center px-3 max-w-[120px]">
               <p className="text-[10px] font-bold uppercase tracking-widest mb-1 truncate"
                 style={{ color: COLORS[activeCatData.name] }}>
                 {activeCatData.name}
@@ -229,6 +590,50 @@ function CategorySection({ byCategory, totalSpent, isDark }) {
             </div>
           )}
         </div>
+
+        {/* Locked category detail overlay */}
+        {lockedCat && activeCatData && (() => {
+          const catTx = transactions.filter(t => t.category === lockedCat && t.amount < 0)
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+          return (
+            <div className="absolute inset-0 rounded-xl bg-white/95 dark:bg-[#0e0e14]/95 backdrop-blur-sm flex flex-col p-3 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-2 shrink-0">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest truncate"
+                    style={{ color: COLORS[lockedCat] }}>
+                    {lockedCat}
+                  </p>
+                  <p className="text-[15px] font-bold tabular-nums text-zinc-900 dark:text-zinc-50 leading-tight">
+                    ${activeCatData.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setLockedCat(null); setHoveredCat(null) }}
+                  className="ml-2 shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors text-xs leading-none">
+                  ✕
+                </button>
+              </div>
+              {/* Transaction list */}
+              <div className="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1">
+                {catTx.length === 0 ? (
+                  <p className="text-[11px] text-zinc-400 text-center mt-4">No transactions</p>
+                ) : catTx.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/[0.04]">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium text-zinc-800 dark:text-zinc-200 truncate">{t.merchant}</p>
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 tabular-nums">{t.date}</p>
+                    </div>
+                    <p className="text-[11px] font-semibold tabular-nums text-red-500 dark:text-red-400 shrink-0">
+                      -${Math.abs(t.amount).toFixed(2)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] text-zinc-400 dark:text-zinc-600 text-center mt-1.5 shrink-0">{catTx.length} transaction{catTx.length !== 1 ? 's' : ''}</p>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Legend list */}
@@ -276,6 +681,53 @@ export default function App() {
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef(null)
 
+  // Vanta birds background
+  const vantaRef    = useRef(null)
+  const vantaEffect = useRef(null)
+
+  useEffect(() => {
+    if (vantaEffect.current) vantaEffect.current.destroy()
+    if (!vantaRef.current) return
+
+    if (isDark) {
+      vantaEffect.current = BIRDS({
+        el: vantaRef.current,
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: true,
+        gyroControls: false,
+        minHeight: 200.00,
+        minWidth: 200.00,
+        scale: 1.00,
+        scaleMobile: 1.00,
+        backgroundColor: 0x081528,
+        color1: 0xef00ff,
+        birdSize: 0.90,
+        speedLimit: 3.00,
+        quantity: 4.00,
+      })
+    } else {
+      vantaEffect.current = BIRDS({
+        el: vantaRef.current,
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: true,
+        gyroControls: false,
+        minHeight: 200.00,
+        minWidth: 200.00,
+        scale: 1.00,
+        scaleMobile: 1.00,
+        backgroundAlpha: 0,
+        color1: 0xef00ff,
+        birdSize: 0.90,
+        speedLimit: 3.00,
+        quantity: 4.00,
+      })
+    }
+
+    return () => { if (vantaEffect.current) vantaEffect.current.destroy() }
+  }, [isDark])
+
   // Table sort
   const [sortCol, setSortCol] = useState('date')
   const [sortDir, setSortDir] = useState('desc')
@@ -297,7 +749,27 @@ export default function App() {
   const [formCategory, setFormCategory] = useState('Food & Dining')
   const [formPayment,  setFormPayment]  = useState('Chase Unlimited')
   const [formAmount,   setFormAmount]   = useState('')
-  const [manualTx,     setManualTx]     = useState([])
+
+  // Unified transaction store (CSV + manual), each tx has a stable id
+  const [allTx, setAllTx] = useState(() => {
+    const unlimitedRows = parseCSV(unlimitedRaw)
+    const flexRows      = parseCSV(flexRaw)
+    const toTx = (r, src) => ({
+      id:       nextId(),
+      date:     r['Transaction Date'],
+      merchant: decodeEntities(r['Description']),
+      category: categorize(decodeEntities(r['Description'])),
+      amount:   parseFloat(r['Amount']),
+      source:   src,
+    })
+    return [
+      ...unlimitedRows.filter(r => r['Type'] === 'Sale').map(r => toTx(r, 'Chase Unlimited')),
+      ...flexRows.filter(r => r['Type'] === 'Sale').map(r => toTx(r, 'Chase Flex')),
+    ]
+  })
+
+  // Inline row editing
+  const [expandedRow, setExpandedRow] = useState(null)
 
   // Click-outside handlers
   useEffect(() => {
@@ -341,7 +813,8 @@ export default function App() {
 
   const handleAddExpense = (e) => {
     e.preventDefault()
-    setManualTx(prev => [...prev, {
+    setAllTx(prev => [...prev, {
+      id:       nextId(),
       date:     toTxDateStr(fromInputDate(formDate)),
       merchant: formMerchant.trim(),
       category: formCategory,
@@ -354,31 +827,19 @@ export default function App() {
     setFormCategory('Food & Dining'); setFormPayment('Chase Unlimited')
   }
 
-  // ── Data ─────────────────────────────────────────────────────────────────────
-  const allCsvTx = useMemo(() => {
-    const unlimitedRows = parseCSV(unlimitedRaw)
-    const flexRows      = parseCSV(flexRaw)
-    console.log(`unlimited.CSV — total rows: ${unlimitedRows.length}`)
-    console.log(`flex.CSV      — total rows: ${flexRows.length}`)
-    const toTx = (r, src) => ({
-      date:     r['Transaction Date'],
-      merchant: decodeEntities(r['Description']),
-      category: categorize(decodeEntities(r['Description'])),
-      amount:   parseFloat(r['Amount']),
-      source:   src,
-    })
-    return [
-      ...unlimitedRows.filter(r => r['Type'] === 'Sale').map(r => toTx(r, 'Chase Unlimited')),
-      ...flexRows.filter(r => r['Type'] === 'Sale').map(r => toTx(r, 'Chase Flex')),
-    ]
-  }, [])
+  const handleEditTx = (id, updated) =>
+    setAllTx(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t))
 
+  const handleDeleteTx = (id) =>
+    setAllTx(prev => prev.filter(t => t.id !== id))
+
+  // ── Data ─────────────────────────────────────────────────────────────────────
   const transactions = useMemo(() => {
-    return [...allCsvTx, ...manualTx].filter(t => {
+    return allTx.filter(t => {
       const d = parseTxDate(t.date)
       return d >= dateRange.start && d <= dateRange.end
     })
-  }, [allCsvTx, manualTx, dateRange])
+  }, [allTx, dateRange])
 
   const byCategory = useMemo(() => {
     const map = {}
@@ -388,36 +849,6 @@ export default function App() {
       .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
       .sort((a, b) => b.value - a.value)
   }, [transactions])
-
-  const trendData = useMemo(() => {
-    const purchases = transactions.filter(t => t.amount < 0)
-    const rangeDays = Math.ceil((dateRange.end - dateRange.start) / (1000*60*60*24)) + 1
-    const buckets = []
-    if (rangeDays <= 62) {
-      let cursor = new Date(dateRange.start)
-      while (cursor <= dateRange.end) {
-        const wEnd = new Date(cursor); wEnd.setDate(wEnd.getDate() + 6)
-        const bucketEnd = wEnd > dateRange.end ? new Date(dateRange.end) : wEnd
-        buckets.push({ start: new Date(cursor), end: bucketEnd,
-          label: cursor.toLocaleDateString('en-US', { month:'short', day:'numeric' }) })
-        cursor.setDate(cursor.getDate() + 7)
-      }
-    } else {
-      let cursor = new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), 1)
-      while (cursor <= dateRange.end) {
-        const mEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0)
-        buckets.push({ start: new Date(cursor), end: mEnd,
-          label: cursor.toLocaleDateString('en-US', { month:'short', year:'2-digit' }) })
-        cursor.setMonth(cursor.getMonth() + 1)
-      }
-    }
-    return buckets.map(b => ({
-      label: b.label,
-      amount: parseFloat(purchases
-        .filter(t => { const d = parseTxDate(t.date); return d >= b.start && d <= b.end })
-        .reduce((s, t) => s + (isNaN(t.amount) ? 0 : Math.abs(t.amount)), 0).toFixed(2)) || 0,
-    }))
-  }, [transactions, dateRange])
 
   const handleSort = (col) => {
     if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -440,19 +871,18 @@ export default function App() {
   const rangeDays     = Math.max(1, Math.ceil((dateRange.end - dateRange.start) / (1000*60*60*24)) + 1)
   const dailyAvg      = totalSpent / rangeDays
 
-  const chartGrid = isDark ? '#1f1f2e' : '#e4e4e7'
-  const chartAxis = isDark ? '#d4d4d8' : '#a1a1aa'
-  const chartBar  = isDark ? '#6366f1' : '#818cf8'
-
   return (
     <div className={isDark ? 'dark' : ''}>
       {/* keyframe for center label fade-in */}
       <style>{`@keyframes fadeIn { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }`}</style>
 
-      <div className="h-screen flex flex-col bg-zinc-50 dark:bg-[#07070b] font-sans antialiased overflow-hidden">
+      {/* Vanta birds background — fixed, behind all content */}
+      <div ref={vantaRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }} />
+
+      <div className="h-screen flex flex-col bg-transparent font-sans antialiased overflow-hidden">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <header className="shrink-0 border-b border-zinc-200 dark:border-white/[0.06] bg-white dark:bg-[#07070b] px-7 py-3.5 flex items-center justify-between">
+        <header className="shrink-0 relative z-10 border-b border-white/40 dark:border-white/10 bg-white/20 dark:bg-[#0a1f3d]/40 backdrop-blur-sm px-7 py-3.5 flex items-center justify-between">
           <div>
             <h1 className="text-[15px] font-bold tracking-tight leading-none text-zinc-900 dark:text-zinc-50">Money Spread</h1>
             <p className="text-[11px] mt-1 leading-none text-zinc-500 dark:text-zinc-300">Saving Money so I don't go broke</p>
@@ -508,6 +938,26 @@ export default function App() {
                   <p className="text-5xl font-bold tracking-tight tabular-nums leading-none text-zinc-900 dark:text-zinc-50">
                     ${totalSpent.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
                   </p>
+                  <div className="mt-3 space-y-1">
+                    {[
+                      { label: 'Flex',      color: '#f97316', source: 'Chase Flex'      },
+                      { label: 'Unlimited', color: '#6366f1', source: 'Chase Unlimited' },
+                    ].map(({ label, color, source }) => {
+                      const amt = transactions.filter(t => t.source === source && t.amount < 0)
+                        .reduce((s, t) => s + Math.abs(t.amount), 0)
+                      return (
+                        <div key={source} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                            <span className="text-base font-bold text-zinc-800 dark:text-white">{label}</span>
+                          </div>
+                          <span className="text-base font-semibold tabular-nums text-zinc-800 dark:text-white">
+                            ${amt.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div className="w-full h-px my-4 bg-zinc-100 dark:bg-white/[0.06]" />
                 <div className="grid grid-cols-3 gap-4">
@@ -534,6 +984,7 @@ export default function App() {
                 byCategory={byCategory}
                 totalSpent={totalSpent}
                 isDark={isDark}
+                transactions={transactions}
               />
             </Card>
 
@@ -541,7 +992,7 @@ export default function App() {
             <Card title="Transactions" action={<span className="text-[10px] text-zinc-400 dark:text-zinc-300">{sortedTx.length} entries</span>}>
               <div className="flex-1 overflow-y-auto -mx-1 px-1">
                 <table className="w-full text-sm border-separate border-spacing-0">
-                  <thead className="sticky top-0 bg-white dark:bg-[#0e0e14]">
+                  <thead className="sticky top-0 z-10 bg-white/70 dark:bg-[#0a1f3d]/80 backdrop-blur-md">
                     <tr>
                       {[
                         { col: 'date',     label: 'Date',    cls: 'pr-3 text-left' },
@@ -569,33 +1020,51 @@ export default function App() {
                     <tr><td colSpan={5}><div className="h-px w-full mb-1 bg-zinc-100 dark:bg-white/[0.06]" /></td></tr>
                   </thead>
                   <tbody>
-                    {sortedTx.map((t, i) => {
+                    {sortedTx.map((t) => {
                       const isUnlimited = t.source === 'Chase Unlimited'
                       const isFlex      = t.source === 'Chase Flex'
+                      const isExpanded  = expandedRow === t.id
                       return (
-                        <tr key={i} className="transition-colors hover:bg-zinc-50 dark:hover:bg-white/[0.03]">
-                          <td className="py-2 pr-3 text-[11px] whitespace-nowrap tabular-nums text-zinc-500 dark:text-zinc-300">{t.date}</td>
-                          <td className="py-2 pr-3 max-w-[130px]">
-                            <span className="block truncate text-[12px] font-medium text-zinc-800 dark:text-zinc-200" title={t.merchant}>{t.merchant}</span>
-                          </td>
-                          <td className="py-2 pr-3">
-                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
-                              style={{ backgroundColor:(COLORS[t.category]??'#6b7280')+'20', color:COLORS[t.category]??'#9ca3af' }}>
-                              {t.category}
-                            </span>
-                          </td>
-                          <td className="py-2 pr-3">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap
-                              ${isUnlimited ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
-                              : isFlex      ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
-                              :               'bg-zinc-100 text-zinc-500 dark:bg-white/[0.06] dark:text-zinc-400'}`}>
-                              {isUnlimited ? 'Unlimited' : isFlex ? 'Flex' : t.source}
-                            </span>
-                          </td>
-                          <td className={`py-2 text-right text-[12px] font-semibold tabular-nums ${t.amount < 0 ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {t.amount < 0 ? `-$${Math.abs(t.amount).toFixed(2)}` : `+$${t.amount.toFixed(2)}`}
-                          </td>
-                        </tr>
+                        <Fragment key={t.id}>
+                          <tr
+                            className={`cursor-pointer transition-colors select-none
+                              ${isExpanded ? 'bg-zinc-50 dark:bg-white/[0.05]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]'}`}
+                            onClick={() => setExpandedRow(r => r === t.id ? null : t.id)}>
+                            <td className="py-2 pr-3 text-[11px] whitespace-nowrap tabular-nums text-zinc-500 dark:text-zinc-300">{t.date}</td>
+                            <td className="py-2 pr-3 max-w-[130px]">
+                              <span className="block truncate text-[12px] font-medium text-zinc-800 dark:text-zinc-200" title={t.merchant}>{t.merchant}</span>
+                            </td>
+                            <td className="py-2 pr-3">
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                style={{ backgroundColor:(COLORS[t.category]??'#6b7280')+'20', color:COLORS[t.category]??'#9ca3af' }}>
+                                {t.category}
+                              </span>
+                            </td>
+                            <td className="py-2 pr-3">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap
+                                ${isUnlimited ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
+                                : isFlex      ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
+                                :               'bg-zinc-100 text-zinc-500 dark:bg-white/[0.06] dark:text-zinc-400'}`}>
+                                {isUnlimited ? 'Unlimited' : isFlex ? 'Flex' : t.source}
+                              </span>
+                            </td>
+                            <td className={`py-2 text-right text-[12px] font-semibold tabular-nums ${t.amount < 0 ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                              {t.amount < 0 ? `-$${Math.abs(t.amount).toFixed(2)}` : `+$${t.amount.toFixed(2)}`}
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={5} className="p-0">
+                                <TxEditForm
+                                  tx={t}
+                                  onSave={(updated) => { handleEditTx(t.id, updated); setExpandedRow(null) }}
+                                  onDelete={() => { handleDeleteTx(t.id); setExpandedRow(null) }}
+                                  onCancel={() => setExpandedRow(null)}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       )
                     })}
                   </tbody>
@@ -605,27 +1074,12 @@ export default function App() {
 
             {/* Q4 — Trends */}
             <Card title="Trends">
-              <div className="flex flex-col h-full gap-3">
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-300">
-                  {rangeDays <= 62 ? 'Weekly' : 'Monthly'} spending — {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
-                </p>
-                <div className="flex-1 min-h-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData} margin={{ top:4, right:4, left:-16, bottom: rangeDays <= 62 ? 14 : 0 }} barSize={28}>
-                      <CartesianGrid vertical={false} stroke={chartGrid} strokeDasharray="3 3" />
-                      <XAxis dataKey="label" axisLine={false} tickLine={false}
-                        tick={{ fill: chartAxis, fontSize: 10 }}
-                        label={rangeDays <= 62
-                          ? { value: 'Week of', position: 'insideBottom', offset: -2, fill: chartAxis, fontSize: 9 }
-                          : undefined}
-                      />
-                      <YAxis tick={{ fill:chartAxis, fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`} />
-                      <Tooltip content={<ChartTip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }} />
-                      <Bar dataKey="amount" fill={chartBar} radius={[5,5,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+              <TrendsSection
+                allTx={allTx}
+                dateRange={dateRange}
+                rangeDays={rangeDays}
+                isDark={isDark}
+              />
             </Card>
 
           </div>

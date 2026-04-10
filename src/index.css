@@ -1,5 +1,26 @@
 @import "tailwindcss";
-@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --color-bg:         hsl(43, 35%, 95%);
+  --color-bg-card:    hsl(43, 40%, 98%);
+  --color-fg:         hsl(150, 22%, 14%);
+  --color-primary:    hsl(145, 38%, 34%);
+  --color-secondary:  hsl(140, 22%, 82%);
+  --color-muted-bg:   hsl(140, 16%, 90%);
+  --color-muted-text: hsl(145, 14%, 46%);
+  --color-accent:     hsl(42, 68%, 58%);
+  --color-border:     hsl(140, 18%, 80%);
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+h1, h2, h3 {
+  font-family: 'Playfair Display', serif;
+}
 
 /* Remove focus outlines from Recharts SVG elements */
 svg:focus,

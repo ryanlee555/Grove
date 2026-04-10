@@ -1,27 +1,25 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react'
-import * as THREE from 'three'
-import BIRDS from 'vanta/src/vanta.birds'
 import {
   PieChart, Pie, Cell, Sector, Tooltip,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line,
 } from 'recharts'
-import { Moon, Sun, ChevronDown, X, Plus } from 'lucide-react'
+import { ChevronDown, X, Plus } from 'lucide-react'
 import unlimitedRaw from './data/unlimited.CSV?raw'
 import flexRaw from './data/flex.CSV?raw'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS = {
-  'Food & Dining':     '#f97316',
-  'Groceries':         '#22c55e',
-  'Events':            '#a855f7',
-  'Subscriptions':     '#3b82f6',
-  'Transport':         '#eab308',
-  'Shopping':          '#ec4899',
-  'Bills & Utilities': '#06b6d4',
-  'Travel':            '#14b8a6',
-  'Nightlife':         '#f43f5e',
-  'Miscellaneous':     '#6b7280',
+  'Food & Dining':     'hsl(145, 38%, 34%)',
+  'Groceries':         'hsl(140, 22%, 52%)',
+  'Events':            'hsl(42, 68%, 58%)',
+  'Subscriptions':     'hsl(200, 30%, 52%)',
+  'Transport':         'hsl(25, 55%, 52%)',
+  'Shopping':          'hsl(340, 30%, 55%)',
+  'Bills & Utilities': 'hsl(150, 22%, 14%)',
+  'Travel':            'hsl(42, 45%, 72%)',
+  'Nightlife':         'hsl(270, 20%, 52%)',
+  'Miscellaneous':     'hsl(140, 16%, 68%)',
 }
 const CATEGORIES   = Object.keys(COLORS)
 const CARD_OPTIONS = ['Chase Unlimited', 'Chase Flex', 'Other']
@@ -147,12 +145,30 @@ function decodeEntities(s) {
   return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
 }
 
-// ─── Shared components ────────────────────────────────────────────────────────
-function Card({ title, action, children }) {
+// ─── Grove leaf logo ──────────────────────────────────────────────────────────
+function LeafLogo() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/60 dark:border-white/10 bg-white/15 dark:bg-[#0a1f3d]/25 backdrop-blur-sm">
+    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+      style={{ backgroundColor: '#3a7d54' }}>
+      <svg width="16" height="18" viewBox="0 0 16 18" fill="none">
+        <path d="M8 1C8 1 14 5.5 14 10.5C14 13.54 11.31 16 8 16C4.69 16 2 13.54 2 10.5C2 5.5 8 1 8 1Z" fill="white"/>
+        <line x1="8" y1="16" x2="8" y2="18" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    </div>
+  )
+}
+
+// ─── Shared components ────────────────────────────────────────────────────────
+function Card({ title, action, children, divider = false, colDivider = false }) {
+  return (
+    <div className="flex flex-col overflow-hidden"
+      style={{
+        ...(divider    && { borderTop:  '1px solid var(--color-border)' }),
+        ...(colDivider && { borderLeft: '1px solid var(--color-border)' }),
+      }}>
       <div className="flex items-center justify-between px-6 pt-5 pb-0 shrink-0">
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-300">{title}</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em]"
+          style={{ color: 'var(--color-muted-text)' }}>{title}</span>
         {action}
       </div>
       <div className="flex-1 overflow-hidden flex flex-col px-6 pb-5 pt-3">{children}</div>
@@ -166,9 +182,10 @@ function ChartTip({ active, payload }) {
   const label = item.name ?? item.label ?? ''
   const value = item.value ?? item.amount ?? payload[0].value ?? 0
   return (
-    <div className="rounded-xl px-3 py-2 text-sm shadow-xl border bg-white dark:bg-[#1a1a24] border-zinc-200 dark:border-white/10">
-      <p className="font-medium text-xs text-zinc-500 dark:text-zinc-300 mb-0.5">{label}</p>
-      <p className="font-bold text-zinc-900 dark:text-zinc-50">${Number(value).toFixed(2)}</p>
+    <div className="rounded-xl px-3 py-2 text-sm shadow-xl border"
+      style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
+      <p className="font-medium text-xs mb-0.5" style={{ color: 'var(--color-muted-text)' }}>{label}</p>
+      <p className="font-bold" style={{ color: 'var(--color-fg)' }}>${Number(value).toFixed(2)}</p>
     </div>
   )
 }
@@ -180,18 +197,19 @@ function StackedBarTip({ active, payload, label, isWeekly }) {
   const total = items.reduce((s, p) => s + p.value, 0)
   const header = isWeekly ? `Week of ${label}` : label
   return (
-    <div className="rounded-xl px-3 py-2.5 shadow-xl border bg-white dark:bg-[#1a1a24] border-zinc-200 dark:border-white/10 min-w-[195px]">
-      <p className="font-bold text-[13px] text-zinc-900 dark:text-zinc-50 mb-2 leading-tight">
-        {header} <span className="text-indigo-500 dark:text-indigo-400">· ${total.toFixed(2)}</span>
+    <div className="rounded-xl px-3 py-2.5 shadow-xl border min-w-[195px]"
+      style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
+      <p className="font-bold text-[13px] mb-2 leading-tight" style={{ color: 'var(--color-fg)' }}>
+        {header} <span style={{ color: 'var(--color-primary)' }}>· ${total.toFixed(2)}</span>
       </p>
       <div className="space-y-1">
         {items.map(p => (
           <div key={p.dataKey} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: p.fill }} />
-              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{p.dataKey}</span>
+              <span className="text-[11px] truncate" style={{ color: 'var(--color-muted-text)' }}>{p.dataKey}</span>
             </div>
-            <span className="text-[11px] font-semibold tabular-nums text-zinc-800 dark:text-zinc-200 shrink-0">
+            <span className="text-[11px] font-semibold tabular-nums shrink-0" style={{ color: 'var(--color-fg)' }}>
               ${Number(p.value).toFixed(2)}
             </span>
           </div>
@@ -206,8 +224,9 @@ function LineTip({ active, payload, label, compareRanges, dateRange, lineColors,
   if (!active || !payload?.length) return null
   const visible = payload.filter(p => p.value != null)
   return (
-    <div className="rounded-xl px-3 py-2.5 shadow-xl border bg-white dark:bg-[#1a1a24] border-zinc-200 dark:border-white/10 min-w-[160px]">
-      <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 mb-1.5">
+    <div className="rounded-xl px-3 py-2.5 shadow-xl border min-w-[160px]"
+      style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
+      <p className="text-[10px] font-medium mb-1.5" style={{ color: 'var(--color-muted-text)' }}>
         {hasComparisons ? label : `Week of ${label}`}
       </p>
       {visible.map(p => {
@@ -219,9 +238,9 @@ function LineTip({ active, payload, label, compareRanges, dateRange, lineColors,
           <div key={p.dataKey} className="flex items-center justify-between gap-3 py-0.5">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="w-3 h-[2px] rounded shrink-0" style={{ backgroundColor: lineColors[idx] }} />
-              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[90px]">{periodName}</span>
+              <span className="text-[11px] truncate max-w-[90px]" style={{ color: 'var(--color-muted-text)' }}>{periodName}</span>
             </div>
-            <span className="text-[11px] font-bold tabular-nums text-zinc-900 dark:text-zinc-50 shrink-0">
+            <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: 'var(--color-fg)' }}>
               ${Number(p.value).toFixed(2)}
             </span>
           </div>
@@ -231,7 +250,15 @@ function LineTip({ active, payload, label, compareRanges, dateRange, lineColors,
   )
 }
 
-const inputCls = 'w-full rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#1a1a24] text-zinc-900 dark:text-zinc-100 text-sm px-3 py-2 outline-none focus:border-indigo-400 dark:focus:border-indigo-500 transition-colors placeholder:text-zinc-400 dark:placeholder:text-zinc-600'
+const inputCls = [
+  'w-full rounded-lg border text-sm px-3 py-2 outline-none transition-colors',
+  'placeholder:opacity-60',
+].join(' ')
+const inputStyle = {
+  borderColor: 'var(--color-border)',
+  backgroundColor: 'var(--color-bg)',
+  color: 'var(--color-fg)',
+}
 
 // ─── Inline transaction edit form ─────────────────────────────────────────────
 function TxEditForm({ tx, onSave, onDelete, onCancel }) {
@@ -250,31 +277,34 @@ function TxEditForm({ tx, onSave, onDelete, onCancel }) {
 
   return (
     <form onSubmit={handleSave}
-      className="px-4 py-3 bg-zinc-50 dark:bg-[#0a0a10] border-t border-zinc-100 dark:border-white/[0.05]"
+      className="px-4 py-3 border-t"
+      style={{ backgroundColor: 'var(--color-muted-bg)', borderColor: 'var(--color-border)' }}
       onClick={e => e.stopPropagation()}>
       <div className="grid grid-cols-5 gap-2 mb-2.5">
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
-        <input type="text" value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="Merchant" className={inputCls} />
-        <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} style={inputStyle} />
+        <input type="text" value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="Merchant" className={inputCls} style={inputStyle} />
+        <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls} style={inputStyle}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={source} onChange={e => setSource(e.target.value)} className={inputCls}>
+        <select value={source} onChange={e => setSource(e.target.value)} className={inputCls} style={inputStyle}>
           {CARD_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
-          placeholder="Amount" step="0.01" min="0" className={inputCls} />
+          placeholder="Amount" step="0.01" min="0" className={inputCls} style={inputStyle} />
       </div>
       <div className="flex items-center gap-2">
         <button type="submit"
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors">
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+          style={{ backgroundColor: 'var(--color-primary)' }}>
           Save
         </button>
         <button type="button" onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-white/[0.07] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/[0.12] transition-colors">
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+          style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-fg)' }}>
           Cancel
         </button>
         <button type="button" onClick={onDelete}
-          className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors">
+          className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
           Delete
         </button>
       </div>
@@ -283,18 +313,22 @@ function TxEditForm({ tx, onSave, onDelete, onCancel }) {
 }
 
 // ─── Trends section (Q4) ──────────────────────────────────────────────────────
-const LINE_COLORS_DARK  = ['#a5b4fc', '#34d399', '#fb923c', '#f472b6', '#facc15']
-const LINE_COLORS_LIGHT = ['#4f46e5', '#10b981', '#f97316', '#ec4899', '#ca8a04']
+const LINE_COLORS = [
+  'hsl(145, 38%, 34%)',
+  'hsl(42, 68%, 58%)',
+  'hsl(200, 30%, 52%)',
+  'hsl(25, 55%, 52%)',
+  'hsl(270, 20%, 52%)',
+]
 
-function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
+function TrendsSection({ allTx, dateRange, rangeDays }) {
   const [view,          setView]          = useState('bar')
   const [compareRanges, setCompareRanges] = useState([])
   const [compMonthId,   setCompMonthId]   = useState('')
 
-  const lineColors = isDark ? LINE_COLORS_DARK : LINE_COLORS_LIGHT
-  const cg         = isDark ? '#1f1f2e' : '#e4e4e7'
-  const ca         = isDark ? '#71717a' : '#a1a1aa'
-  const cursorFill = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'
+  const cg         = 'hsl(140, 18%, 80%)'
+  const ca         = 'hsl(145, 14%, 46%)'
+  const cursorFill = 'rgba(58, 125, 84, 0.06)'
   const isWeekly   = rangeDays <= 62
 
   // Check whether the current date range is exactly a full calendar month
@@ -373,16 +407,17 @@ function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
 
       {/* Row 1 — subtitle + Bar/Line toggle */}
       <div className="flex items-center justify-between shrink-0 gap-2">
-        <p className="text-[11px] text-zinc-500 dark:text-zinc-300 truncate">
+        <p className="text-[11px] truncate" style={{ color: 'var(--color-muted-text)' }}>
           {isWeekly ? 'Weekly' : 'Monthly'} spending — {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
         </p>
-        <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-white/[0.06] rounded-lg p-0.5 shrink-0">
+        <div className="flex items-center gap-0.5 rounded-lg p-0.5 shrink-0"
+          style={{ backgroundColor: 'var(--color-muted-bg)' }}>
           {['bar','line'].map(v => (
             <button key={v} onClick={() => setView(v)}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-colors
-                ${view === v
-                  ? 'bg-white dark:bg-[#1a1a24] text-zinc-800 dark:text-zinc-100 shadow-sm'
-                  : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-400'}`}>
+              className="px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-colors"
+              style={view === v
+                ? { backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
+                : { color: 'var(--color-muted-text)' }}>
               {v === 'bar' ? 'Bar' : 'Line'}
             </button>
           ))}
@@ -393,17 +428,19 @@ function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
       {view === 'line' && (
         <div className="shrink-0 space-y-1.5">
           {!isFullMonth ? (
-            <p className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-2.5 py-1.5 leading-snug">
+            <p className="text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-snug">
               Compare is only available for full months. Adjust your date range to a single full month to enable it.
             </p>
           ) : (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide shrink-0">Compare:</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide shrink-0"
+                style={{ color: 'var(--color-muted-text)' }}>Compare:</span>
               <select
                 value={compMonthId}
                 onChange={e => addMonth(e.target.value)}
                 disabled={compareRanges.length >= 4}
-                className="px-2 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#1a1a24] text-[10px] text-zinc-600 dark:text-zinc-300 outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-zinc-50 dark:hover:bg-white/[0.06]">
+                className="px-2 py-1 rounded-md border text-[10px] outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)' }}>
                 <option value="">Add month…</option>
                 {availableMonths
                   .filter(m => !compareRanges.find(r => r.id === m.id))
@@ -416,14 +453,14 @@ function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
           {hasComparisons && (
             <div className="flex gap-1.5 flex-wrap">
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
-                style={{ backgroundColor: lineColors[0] + '28', color: lineColors[0] }}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: lineColors[0] }} />
+                style={{ backgroundColor: LINE_COLORS[0] + '28', color: LINE_COLORS[0] }}>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: LINE_COLORS[0] }} />
                 {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
               </span>
               {compareRanges.map((cr, i) => (
                 <span key={cr.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
-                  style={{ backgroundColor: lineColors[i+1] + '28', color: lineColors[i+1] }}>
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: lineColors[i+1] }} />
+                  style={{ backgroundColor: LINE_COLORS[i+1] + '28', color: LINE_COLORS[i+1] }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: LINE_COLORS[i+1] }} />
                   {cr.label}
                   <button onClick={() => removeComparison(cr.id)} className="ml-0.5 opacity-60 hover:opacity-100 leading-none">×</button>
                 </span>
@@ -460,12 +497,12 @@ function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
               <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill:ca, fontSize:10 }} />
               <YAxis tick={{ fill:ca, fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`} />
               <Tooltip
-                content={(props) => <LineTip {...props} compareRanges={compareRanges} dateRange={dateRange} lineColors={lineColors} hasComparisons={hasComparisons} />}
-                cursor={{ stroke: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', strokeWidth:1 }}
+                content={(props) => <LineTip {...props} compareRanges={compareRanges} dateRange={dateRange} lineColors={LINE_COLORS} hasComparisons={hasComparisons} />}
+                cursor={{ stroke: 'rgba(58, 125, 84, 0.2)', strokeWidth:1 }}
               />
-              <Line dataKey="primary" stroke={lineColors[0]} strokeWidth={2.5} dot={false} connectNulls activeDot={{ r:4, strokeWidth:0 }} />
+              <Line dataKey="primary" stroke={LINE_COLORS[0]} strokeWidth={2.5} dot={false} connectNulls activeDot={{ r:4, strokeWidth:0 }} />
               {compareRanges.map((cr, i) => (
-                <Line key={cr.id} dataKey={`comp${i}`} stroke={lineColors[i+1]} strokeWidth={2} dot={false} connectNulls strokeDasharray="5 3" activeDot={{ r:4, strokeWidth:0 }} />
+                <Line key={cr.id} dataKey={`comp${i}`} stroke={LINE_COLORS[i+1]} strokeWidth={2} dot={false} connectNulls strokeDasharray="5 3" activeDot={{ r:4, strokeWidth:0 }} />
               ))}
             </LineChart>
           </ResponsiveContainer>
@@ -476,15 +513,15 @@ function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
       {view === 'line' && hasComparisons && (
         <div className="shrink-0 flex items-center gap-3 flex-wrap pt-0.5">
           {[
-            { key:'primary', label: formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end), color: lineColors[0], dashed: false },
-            ...compareRanges.map((cr, i) => ({ key: cr.id, label: cr.label, color: lineColors[i+1], dashed: true })),
+            { key:'primary', label: formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end), color: LINE_COLORS[0], dashed: false },
+            ...compareRanges.map((cr, i) => ({ key: cr.id, label: cr.label, color: LINE_COLORS[i+1], dashed: true })),
           ].map(({ key, label, color, dashed }) => (
             <div key={key} className="flex items-center gap-1.5 min-w-0">
               <svg width="20" height="6" viewBox="0 0 20 6" className="shrink-0">
                 <line x1="0" y1="3" x2="20" y2="3" stroke={color} strokeWidth="2"
                   strokeDasharray={dashed ? '5 3' : 'none'} strokeLinecap="round" />
               </svg>
-              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate max-w-[110px]">{label}</span>
+              <span className="text-[10px] truncate max-w-[110px]" style={{ color: 'var(--color-muted-text)' }}>{label}</span>
             </div>
           ))}
         </div>
@@ -494,7 +531,7 @@ function TrendsSection({ allTx, dateRange, rangeDays, isDark }) {
 }
 
 // ─── Spending by Category section (Q2) ───────────────────────────────────────
-function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
+function CategorySection({ byCategory, totalSpent, transactions }) {
   const [hoveredCat, setHoveredCat] = useState(null)
   const [lockedCat,  setLockedCat]  = useState(null)
   const activeCat = lockedCat ?? hoveredCat
@@ -567,7 +604,7 @@ function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
               {byCategory.map(e => (
                 <Cell
                   key={e.name}
-                  fill={COLORS[e.name] ?? '#6b7280'}
+                  fill={COLORS[e.name] ?? 'hsl(140, 16%, 68%)'}
                   opacity={activeCat && e.name !== activeCat ? 0.3 : 1}
                   style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
                 />
@@ -584,7 +621,7 @@ function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
                 style={{ color: COLORS[activeCatData.name] }}>
                 {activeCatData.name}
               </p>
-              <p className="text-[17px] font-bold tabular-nums text-zinc-900 dark:text-zinc-50 leading-none">
+              <p className="text-[17px] font-bold tabular-nums leading-none" style={{ color: 'var(--color-fg)' }}>
                 ${activeCatData.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
@@ -596,7 +633,8 @@ function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
           const catTx = transactions.filter(t => t.category === lockedCat && t.amount < 0)
             .sort((a, b) => new Date(b.date) - new Date(a.date))
           return (
-            <div className="absolute inset-0 rounded-xl bg-white/95 dark:bg-[#0e0e14]/95 backdrop-blur-sm flex flex-col p-3 overflow-hidden">
+            <div className="absolute inset-0 rounded-xl flex flex-col p-3 overflow-hidden"
+              style={{ backgroundColor: 'var(--color-bg)' }}>
               {/* Header */}
               <div className="flex items-start justify-between mb-2 shrink-0">
                 <div className="min-w-0">
@@ -604,33 +642,37 @@ function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
                     style={{ color: COLORS[lockedCat] }}>
                     {lockedCat}
                   </p>
-                  <p className="text-[15px] font-bold tabular-nums text-zinc-900 dark:text-zinc-50 leading-tight">
+                  <p className="text-[15px] font-bold tabular-nums leading-tight" style={{ color: 'var(--color-fg)' }}>
                     ${activeCatData.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <button
                   onClick={() => { setLockedCat(null); setHoveredCat(null) }}
-                  className="ml-2 shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors text-xs leading-none">
+                  className="ml-2 shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs leading-none transition-colors"
+                  style={{ color: 'var(--color-muted-text)' }}>
                   ✕
                 </button>
               </div>
               {/* Transaction list */}
               <div className="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1">
                 {catTx.length === 0 ? (
-                  <p className="text-[11px] text-zinc-400 text-center mt-4">No transactions</p>
+                  <p className="text-[11px] text-center mt-4" style={{ color: 'var(--color-muted-text)' }}>No transactions</p>
                 ) : catTx.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/[0.04]">
+                  <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg transition-colors"
+                    style={{}}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium text-zinc-800 dark:text-zinc-200 truncate">{t.merchant}</p>
-                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 tabular-nums">{t.date}</p>
+                      <p className="text-[11px] font-medium truncate" style={{ color: 'var(--color-fg)' }}>{t.merchant}</p>
+                      <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</p>
                     </div>
-                    <p className="text-[11px] font-semibold tabular-nums text-red-500 dark:text-red-400 shrink-0">
+                    <p className="text-[11px] font-semibold tabular-nums text-red-600 shrink-0">
                       -${Math.abs(t.amount).toFixed(2)}
                     </p>
                   </div>
                 ))}
               </div>
-              <p className="text-[9px] text-zinc-400 dark:text-zinc-600 text-center mt-1.5 shrink-0">{catTx.length} transaction{catTx.length !== 1 ? 's' : ''}</p>
+              <p className="text-[9px] text-center mt-1.5 shrink-0" style={{ color: 'var(--color-muted-text)' }}>
+                {catTx.length} transaction{catTx.length !== 1 ? 's' : ''}
+              </p>
             </div>
           )
         })()}
@@ -644,25 +686,24 @@ function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
           return (
             <div
               key={name}
-              className={`flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none
-                transition-all duration-150
-                ${isActive
-                  ? 'bg-zinc-100 dark:bg-white/[0.08]'
-                  : 'hover:bg-zinc-50 dark:hover:bg-white/[0.04]'}
-                ${isDimmed ? 'opacity-35' : 'opacity-100'}`}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none transition-all duration-150"
+              style={{
+                backgroundColor: isActive ? 'var(--color-muted-bg)' : 'transparent',
+                opacity: isDimmed ? 0.35 : 1,
+              }}
               onMouseEnter={() => { if (!lockedCat) setHoveredCat(name) }}
               onMouseLeave={() => { if (!lockedCat) setHoveredCat(null) }}
               onClick={() => { setLockedCat(l => l === name ? null : name); setHoveredCat(null) }}
             >
               <span className="w-2 h-2 rounded-full shrink-0 transition-transform duration-150"
-                style={{ backgroundColor: COLORS[name] ?? '#6b7280',
+                style={{ backgroundColor: COLORS[name] ?? 'hsl(140, 16%, 68%)',
                          transform: isActive ? 'scale(1.4)' : 'scale(1)' }} />
               <div className="min-w-0 flex-1">
-                <p className={`text-[11px] truncate transition-all duration-150
-                  ${isActive ? 'font-bold text-zinc-900 dark:text-zinc-50' : 'font-medium text-zinc-800 dark:text-zinc-200'}`}>
+                <p className="text-[11px] truncate transition-all duration-150"
+                  style={{ fontWeight: isActive ? 700 : 500, color: 'var(--color-fg)' }}>
                   {name}
                 </p>
-                <p className="text-[10px] tabular-nums text-zinc-500 dark:text-zinc-300">
+                <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>
                   ${value.toFixed(2)} · {((value / totalSpent) * 100).toFixed(1)}%
                 </p>
               </div>
@@ -676,57 +717,8 @@ function CategorySection({ byCategory, totalSpent, isDark, transactions }) {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  // Theme & nav
-  const [isDark, setIsDark]             = useState(true)
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef(null)
-
-  // Vanta birds background
-  const vantaRef    = useRef(null)
-  const vantaEffect = useRef(null)
-
-  useEffect(() => {
-    if (vantaEffect.current) vantaEffect.current.destroy()
-    if (!vantaRef.current) return
-
-    if (isDark) {
-      vantaEffect.current = BIRDS({
-        el: vantaRef.current,
-        THREE: THREE,
-        mouseControls: true,
-        touchControls: true,
-        gyroControls: false,
-        minHeight: 200.00,
-        minWidth: 200.00,
-        scale: 1.00,
-        scaleMobile: 1.00,
-        backgroundColor: 0x081528,
-        color1: 0xef00ff,
-        birdSize: 0.90,
-        speedLimit: 3.00,
-        quantity: 4.00,
-      })
-    } else {
-      vantaEffect.current = BIRDS({
-        el: vantaRef.current,
-        THREE: THREE,
-        mouseControls: true,
-        touchControls: true,
-        gyroControls: false,
-        minHeight: 200.00,
-        minWidth: 200.00,
-        scale: 1.00,
-        scaleMobile: 1.00,
-        backgroundAlpha: 0,
-        color1: 0xef00ff,
-        birdSize: 0.90,
-        speedLimit: 3.00,
-        quantity: 4.00,
-      })
-    }
-
-    return () => { if (vantaEffect.current) vantaEffect.current.destroy() }
-  }, [isDark])
 
   // Table sort
   const [sortCol, setSortCol] = useState('date')
@@ -734,11 +726,11 @@ export default function App() {
 
   // Date range
   const initRange = getPresetRange('this-month')
-  const [dateRange,    setDateRange]    = useState({ preset: 'this-month', ...initRange })
-  const [showDatePicker, setShowDatePicker]   = useState(false)
-  const [customStart,    setCustomStart]      = useState(toInputDate(initRange.start))
-  const [customEnd,      setCustomEnd]        = useState(toInputDate(initRange.end))
-  const [datePickerPos,  setDatePickerPos]    = useState({ top: 0, left: 0 })
+  const [dateRange,      setDateRange]      = useState({ preset: 'this-month', ...initRange })
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [customStart,    setCustomStart]    = useState(toInputDate(initRange.start))
+  const [customEnd,      setCustomEnd]      = useState(toInputDate(initRange.end))
+  const [datePickerPos,  setDatePickerPos]  = useState({ top: 0, left: 0 })
   const dateBtnRef    = useRef(null)
   const datePickerRef = useRef(null)
 
@@ -857,7 +849,7 @@ export default function App() {
 
   const sortedTx = useMemo(() => [...transactions].sort((a, b) => {
     let cmp = 0
-    if (sortCol === 'date')     cmp = parseTxDate(a.date) - parseTxDate(b.date)
+    if (sortCol === 'date')          cmp = parseTxDate(a.date) - parseTxDate(b.date)
     else if (sortCol === 'merchant') cmp = a.merchant.localeCompare(b.merchant)
     else if (sortCol === 'category') cmp = a.category.localeCompare(b.category)
     else if (sortCol === 'amount')   cmp = Math.abs(a.amount) - Math.abs(b.amount)
@@ -872,43 +864,45 @@ export default function App() {
   const dailyAvg      = totalSpent / rangeDays
 
   return (
-    <div className={isDark ? 'dark' : ''}>
-      {/* keyframe for center label fade-in */}
+    <div>
       <style>{`@keyframes fadeIn { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }`}</style>
 
-      {/* Vanta birds background — fixed, behind all content */}
-      <div ref={vantaRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }} />
-
-      <div className="h-screen flex flex-col bg-transparent font-sans antialiased overflow-hidden">
+      <div className="h-screen flex flex-col antialiased overflow-hidden"
+        style={{ backgroundColor: 'var(--color-bg)' }}>
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <header className="shrink-0 relative z-10 border-b border-white/40 dark:border-white/10 bg-white/20 dark:bg-[#0a1f3d]/40 backdrop-blur-sm px-7 py-3.5 flex items-center justify-between">
-          <div>
-            <h1 className="text-[15px] font-bold tracking-tight leading-none text-zinc-900 dark:text-zinc-50">Money Spread</h1>
-            <p className="text-[11px] mt-1 leading-none text-zinc-500 dark:text-zinc-300">Saving Money so I don't go broke</p>
+        <header className="shrink-0 relative z-10 px-7 py-3.5 flex items-center justify-between"
+          style={{ backgroundColor: 'var(--color-bg)' }}>
+          <div className="flex items-center gap-3">
+            <LeafLogo />
+            <div>
+              <h1 className="text-[17px] font-semibold leading-none" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>Grove</h1>
+              <p className="text-[11px] mt-0.5 leading-none" style={{ color: 'var(--color-muted-text)' }}>Grow your wealth, naturally.</p>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <div className="relative group">
-              <button className="w-9 h-9 flex items-center justify-center rounded-xl text-lg transition-colors text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:text-zinc-100 dark:hover:bg-white/[0.06]">💵</button>
-              <div className="pointer-events-none absolute right-0 top-full mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 bg-white dark:bg-[#15151e] border border-zinc-200 dark:border-white/[0.08] text-zinc-800 dark:text-zinc-200">
+              <button className="w-9 h-9 flex items-center justify-center rounded-xl text-lg transition-colors"
+                style={{ color: 'var(--color-muted-text)' }}>💵</button>
+              <div className="pointer-events-none absolute right-0 top-full mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 border"
+                style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}>
                 Hamilton AI
               </div>
             </div>
-            <button onClick={() => setIsDark(d => !d)}
-              className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:text-zinc-100 dark:hover:bg-white/[0.06]">
-              {isDark ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
             <div className="relative" ref={dropdownRef}>
               <button onClick={() => setShowDropdown(s => !s)}
-                className="w-9 h-9 flex items-center justify-center rounded-full text-[13px] font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors">P</button>
+                className="w-9 h-9 flex items-center justify-center rounded-full text-[13px] font-bold text-white transition-colors hover:opacity-90"
+                style={{ backgroundColor: 'var(--color-primary)' }}>P</button>
               {showDropdown && (
-                <div className="absolute right-0 top-full mt-2 w-44 rounded-xl border shadow-2xl overflow-hidden z-50 bg-white dark:bg-[#15151e] border-zinc-200 dark:border-white/[0.08]">
-                  <div className="px-4 py-3 border-b border-zinc-100 dark:border-white/[0.06]">
-                    <p className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100">Pingoo</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-300">Personal account</p>
+                <div className="absolute right-0 top-full mt-2 w-44 rounded-xl border shadow-2xl overflow-hidden z-50"
+                  style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
+                  <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                    <p className="text-[13px] font-semibold" style={{ color: 'var(--color-fg)' }}>Pingoo</p>
+                    <p className="text-[11px]" style={{ color: 'var(--color-muted-text)' }}>Personal account</p>
                   </div>
-                  <button className="w-full text-left px-4 py-2.5 text-[12px] text-zinc-700 dark:text-zinc-300 transition-colors hover:bg-zinc-50 dark:hover:bg-white/[0.05]">Settings</button>
-                  <button className="w-full text-left px-4 py-2.5 text-[12px] text-red-500 dark:text-red-400 transition-colors hover:bg-zinc-50 dark:hover:bg-white/[0.05]">Sign out</button>
+                  <button className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
+                    style={{ color: 'var(--color-fg)' }}>Settings</button>
+                  <button className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80">Sign out</button>
                 </div>
               )}
             </div>
@@ -917,13 +911,16 @@ export default function App() {
 
         {/* ── 2×2 grid ───────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-hidden p-4">
-          <div className="h-full grid grid-cols-2 grid-rows-2 gap-3">
+          <div className="h-full grid grid-cols-2 grid-rows-2 gap-0">
 
             {/* Q1 — Total Spent */}
             <Card title="Total Spent"
               action={
                 <button onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10">
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors"
+                  style={{ color: 'var(--color-primary)' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                   <Plus size={11} /> Add
                 </button>
               }
@@ -931,17 +928,18 @@ export default function App() {
               <div className="flex flex-col h-full justify-between">
                 <div>
                   <button ref={dateBtnRef} onClick={openDatePicker}
-                    className="flex items-center gap-1 mb-2 text-[11px] font-medium text-zinc-500 dark:text-zinc-300 hover:text-zinc-800 dark:hover:text-zinc-100 transition-colors">
+                    className="flex items-center gap-1 mb-2 text-[11px] font-medium transition-colors"
+                    style={{ color: 'var(--color-muted-text)' }}>
                     {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
                     <ChevronDown size={11} className={`transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
                   </button>
-                  <p className="text-5xl font-bold tracking-tight tabular-nums leading-none text-zinc-900 dark:text-zinc-50">
+                  <p className="text-5xl font-bold tracking-tight tabular-nums leading-none" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
                     ${totalSpent.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
                   </p>
                   <div className="mt-3 space-y-1">
                     {[
-                      { label: 'Flex',      color: '#f97316', source: 'Chase Flex'      },
-                      { label: 'Unlimited', color: '#6366f1', source: 'Chase Unlimited' },
+                      { label: 'Flex',      color: 'hsl(25, 55%, 52%)',  source: 'Chase Flex'      },
+                      { label: 'Unlimited', color: 'hsl(145, 38%, 34%)', source: 'Chase Unlimited' },
                     ].map(({ label, color, source }) => {
                       const amt = transactions.filter(t => t.source === source && t.amount < 0)
                         .reduce((s, t) => s + Math.abs(t.amount), 0)
@@ -949,9 +947,9 @@ export default function App() {
                         <div key={source} className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                            <span className="text-base font-bold text-zinc-800 dark:text-white">{label}</span>
+                            <span className="text-base font-bold" style={{ color: 'var(--color-fg)' }}>{label}</span>
                           </div>
-                          <span className="text-base font-semibold tabular-nums text-zinc-800 dark:text-white">
+                          <span className="text-base font-semibold tabular-nums" style={{ color: 'var(--color-fg)' }}>
                             ${amt.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
                           </span>
                         </div>
@@ -959,53 +957,55 @@ export default function App() {
                     })}
                   </div>
                 </div>
-                <div className="w-full h-px my-4 bg-zinc-100 dark:bg-white/[0.06]" />
+                <div className="w-full h-px my-4" style={{ backgroundColor: 'var(--color-border)' }} />
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1 text-zinc-400 dark:text-zinc-300">Daily Avg</p>
-                    <p className="text-xl font-bold tabular-nums text-zinc-900 dark:text-zinc-50">${dailyAvg.toFixed(2)}</p>
+                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--color-muted-text)' }}>Daily Avg</p>
+                    <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-fg)' }}>${dailyAvg.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1 text-zinc-400 dark:text-zinc-300">Transactions</p>
-                    <p className="text-xl font-bold tabular-nums text-zinc-900 dark:text-zinc-50">{purchaseCount}</p>
+                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--color-muted-text)' }}>Transactions</p>
+                    <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-fg)' }}>{purchaseCount}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1 text-zinc-400 dark:text-zinc-300">Top Category</p>
-                    <p className="text-sm font-bold truncate" style={{ color: COLORS[topCategory] ?? '#6b7280' }}>{topCategory}</p>
-                    <p className="text-[11px] tabular-nums text-zinc-500 dark:text-zinc-300">${topCatAmt.toFixed(2)}</p>
+                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--color-muted-text)' }}>Top Category</p>
+                    <p className="text-sm font-bold truncate" style={{ color: COLORS[topCategory] ?? 'hsl(140, 16%, 68%)' }}>{topCategory}</p>
+                    <p className="text-[11px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>${topCatAmt.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
             </Card>
 
             {/* Q2 — Spending by Category */}
-            <Card title="Spending by Category">
+            <Card title="Spending by Category" colDivider>
               <CategorySection
                 byCategory={byCategory}
                 totalSpent={totalSpent}
-                isDark={isDark}
                 transactions={transactions}
               />
             </Card>
 
             {/* Q3 — Transactions */}
-            <Card title="Transactions" action={<span className="text-[10px] text-zinc-400 dark:text-zinc-300">{sortedTx.length} entries</span>}>
+            <Card title="Transactions" divider action={
+              <span className="text-[10px]" style={{ color: 'var(--color-muted-text)' }}>{sortedTx.length} entries</span>
+            }>
               <div className="flex-1 overflow-y-auto -mx-1 px-1">
                 <table className="w-full text-sm border-separate border-spacing-0">
-                  <thead className="sticky top-0 z-10 bg-white/70 dark:bg-[#0a1f3d]/80 backdrop-blur-md">
+                  <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--color-bg)' }}>
                     <tr>
                       {[
-                        { col: 'date',     label: 'Date',    cls: 'pr-3 text-left' },
-                        { col: 'merchant', label: 'Merchant',cls: 'pr-3 text-left' },
-                        { col: 'category', label: 'Category',cls: 'pr-3 text-left' },
-                        { col: 'source',   label: 'Card',    cls: 'pr-3 text-left', noSort: true },
-                        { col: 'amount',   label: 'Amount',  cls: 'text-right' },
+                        { col: 'date',     label: 'Date',     cls: 'pr-3 text-left' },
+                        { col: 'merchant', label: 'Merchant', cls: 'pr-3 text-left' },
+                        { col: 'category', label: 'Category', cls: 'pr-3 text-left' },
+                        { col: 'source',   label: 'Card',     cls: 'pr-3 text-left', noSort: true },
+                        { col: 'amount',   label: 'Amount',   cls: 'text-right' },
                       ].map(({ col, label, cls, noSort }) => {
                         const isActive = sortCol === col
                         return (
                           <th key={col}
                             className={`pb-2.5 ${cls} text-[10px] font-bold uppercase tracking-widest transition-colors select-none
-                              ${noSort ? 'text-zinc-400 dark:text-zinc-300' : 'cursor-pointer ' + (isActive ? 'text-zinc-700 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-300 hover:text-zinc-600 dark:hover:text-zinc-200')}`}
+                              ${!noSort ? 'cursor-pointer' : ''}`}
+                            style={{ color: isActive ? 'var(--color-fg)' : 'var(--color-muted-text)' }}
                             onClick={noSort ? undefined : () => handleSort(col)}>
                             {label}
                             {!noSort && (
@@ -1017,7 +1017,7 @@ export default function App() {
                         )
                       })}
                     </tr>
-                    <tr><td colSpan={5}><div className="h-px w-full mb-1 bg-zinc-100 dark:bg-white/[0.06]" /></td></tr>
+                    <tr><td colSpan={5}><div className="h-px w-full mb-1" style={{ backgroundColor: 'var(--color-border)' }} /></td></tr>
                   </thead>
                   <tbody>
                     {sortedTx.map((t) => {
@@ -1027,28 +1027,33 @@ export default function App() {
                       return (
                         <Fragment key={t.id}>
                           <tr
-                            className={`cursor-pointer transition-colors select-none
-                              ${isExpanded ? 'bg-zinc-50 dark:bg-white/[0.05]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]'}`}
+                            className="cursor-pointer transition-colors select-none"
+                            style={{ backgroundColor: isExpanded ? 'var(--color-muted-bg)' : 'transparent' }}
+                            onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)' }}
+                            onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'transparent' }}
                             onClick={() => setExpandedRow(r => r === t.id ? null : t.id)}>
-                            <td className="py-2 pr-3 text-[11px] whitespace-nowrap tabular-nums text-zinc-500 dark:text-zinc-300">{t.date}</td>
+                            <td className="py-2 pr-3 text-[11px] whitespace-nowrap tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</td>
                             <td className="py-2 pr-3 max-w-[130px]">
-                              <span className="block truncate text-[12px] font-medium text-zinc-800 dark:text-zinc-200" title={t.merchant}>{t.merchant}</span>
+                              <span className="block truncate text-[12px] font-medium" style={{ color: 'var(--color-fg)' }} title={t.merchant}>{t.merchant}</span>
                             </td>
                             <td className="py-2 pr-3">
                               <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
-                                style={{ backgroundColor:(COLORS[t.category]??'#6b7280')+'20', color:COLORS[t.category]??'#9ca3af' }}>
+                                style={{ backgroundColor:(COLORS[t.category]??'hsl(140, 16%, 68%)')+'20', color:COLORS[t.category]??'hsl(140, 16%, 50%)' }}>
                                 {t.category}
                               </span>
                             </td>
                             <td className="py-2 pr-3">
-                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap
-                                ${isUnlimited ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
-                                : isFlex      ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
-                                :               'bg-zinc-100 text-zinc-500 dark:bg-white/[0.06] dark:text-zinc-400'}`}>
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                style={isUnlimited
+                                  ? { backgroundColor: 'hsl(145, 38%, 90%)', color: 'hsl(145, 38%, 28%)' }
+                                  : isFlex
+                                  ? { backgroundColor: 'hsl(25, 55%, 90%)',  color: 'hsl(25, 55%, 32%)' }
+                                  : { backgroundColor: 'var(--color-muted-bg)', color: 'var(--color-muted-text)' }}>
                                 {isUnlimited ? 'Unlimited' : isFlex ? 'Flex' : t.source}
                               </span>
                             </td>
-                            <td className={`py-2 text-right text-[12px] font-semibold tabular-nums ${t.amount < 0 ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            <td className={`py-2 text-right text-[12px] font-semibold tabular-nums ${t.amount < 0 ? 'text-red-600' : ''}`}
+                              style={t.amount >= 0 ? { color: 'var(--color-primary)' } : {}}>
                               {t.amount < 0 ? `-$${Math.abs(t.amount).toFixed(2)}` : `+$${t.amount.toFixed(2)}`}
                             </td>
                           </tr>
@@ -1073,12 +1078,11 @@ export default function App() {
             </Card>
 
             {/* Q4 — Trends */}
-            <Card title="Trends">
+            <Card title="Trends" divider colDivider>
               <TrendsSection
                 allTx={allTx}
                 dateRange={dateRange}
                 rangeDays={rangeDays}
-                isDark={isDark}
               />
             </Card>
 
@@ -1089,99 +1093,112 @@ export default function App() {
       {/* ── Date Range Picker ─────────────────────────────────────────────────── */}
       {showDatePicker && (
         <div ref={datePickerRef}
-          style={{ position:'fixed', top:datePickerPos.top, left:datePickerPos.left, zIndex:200 }}
-          className="w-72 rounded-2xl border shadow-2xl bg-white dark:bg-[#13131a] border-zinc-200 dark:border-white/[0.1] overflow-hidden">
+          className="rounded-2xl border shadow-2xl overflow-hidden"
+          style={{ position:'fixed', top:datePickerPos.top, left:datePickerPos.left, zIndex:200, width:'18rem', backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
           <div className="p-3 grid grid-cols-2 gap-1.5">
-            {PRESETS.map(p => (
-              <button key={p.id} onClick={() => applyPreset(p.id)}
-                className={`px-3 py-2 rounded-lg text-[11px] font-semibold text-left transition-colors
-                  ${dateRange.preset === p.id
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.06]'}`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="h-px bg-zinc-100 dark:bg-white/[0.06] mx-3" />
-          <div className="p-3 space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">Custom Range</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 mb-1">From</label>
-                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 mb-1">To</label>
-                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputCls} />
-              </div>
+              {PRESETS.map(p => (
+                <button key={p.id} onClick={() => applyPreset(p.id)}
+                  className="px-3 py-2 rounded-lg text-[11px] font-semibold text-left transition-colors"
+                  style={dateRange.preset === p.id
+                    ? { backgroundColor: 'var(--color-primary)', color: 'white' }
+                    : { color: 'var(--color-fg)' }}
+                  onMouseEnter={e => { if (dateRange.preset !== p.id) e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)' }}
+                  onMouseLeave={e => { if (dateRange.preset !== p.id) e.currentTarget.style.backgroundColor = 'transparent' }}>
+                  {p.label}
+                </button>
+              ))}
             </div>
-            <button onClick={applyCustom}
-              className="w-full mt-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-semibold transition-colors">
-              Apply
-            </button>
-          </div>
+            <div className="h-px mx-3" style={{ backgroundColor: 'var(--color-border)' }} />
+            <div className="p-3 space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--color-muted-text)' }}>Custom Range</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] mb-1" style={{ color: 'var(--color-muted-text)' }}>From</label>
+                  <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={inputCls} style={inputStyle} />
+                </div>
+                <div>
+                  <label className="block text-[10px] mb-1" style={{ color: 'var(--color-muted-text)' }}>To</label>
+                  <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputCls} style={inputStyle} />
+                </div>
+              </div>
+              <button onClick={applyCustom}
+                className="w-full mt-1 py-2 rounded-lg text-white text-[12px] font-semibold transition-colors hover:opacity-90"
+                style={{ backgroundColor: 'var(--color-primary)' }}>
+                Apply
+              </button>
+            </div>
         </div>
       )}
 
       {/* ── Add Expense Modal ─────────────────────────────────────────────────── */}
       {showAddModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setShowAddModal(false) }}>
-          <div className="w-full max-w-md mx-4 rounded-2xl border shadow-2xl bg-white dark:bg-[#13131a] border-zinc-200 dark:border-white/[0.1]">
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-zinc-100 dark:border-white/[0.06]">
-              <h2 className="text-[15px] font-bold text-zinc-900 dark:text-zinc-50">Add Expense</h2>
+          <div className="w-full max-w-md mx-4 rounded-2xl border shadow-2xl"
+            style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b"
+              style={{ borderColor: 'var(--color-border)' }}>
+              <h2 className="text-[15px] font-semibold" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>Add Expense</h2>
               <button onClick={() => setShowAddModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors">
+                className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                style={{ color: 'var(--color-muted-text)' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                 <X size={14} />
               </button>
             </div>
             <form onSubmit={handleAddExpense} className="px-6 py-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5">Date</label>
-                  <input type="date" required value={formDate} onChange={e => setFormDate(e.target.value)} className={inputCls} />
+                  <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Date</label>
+                  <input type="date" required value={formDate} onChange={e => setFormDate(e.target.value)} className={inputCls} style={inputStyle} />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5">Amount ($)</label>
+                  <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Amount ($)</label>
                   <input type="number" required min="0.01" step="0.01" placeholder="0.00"
-                    value={formAmount} onChange={e => setFormAmount(e.target.value)} className={inputCls} />
+                    value={formAmount} onChange={e => setFormAmount(e.target.value)} className={inputCls} style={inputStyle} />
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5">Merchant</label>
+                <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Merchant</label>
                 <input type="text" required placeholder="e.g. Chipotle"
-                  value={formMerchant} onChange={e => setFormMerchant(e.target.value)} className={inputCls} />
+                  value={formMerchant} onChange={e => setFormMerchant(e.target.value)} className={inputCls} style={inputStyle} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5">Category</label>
-                  <select required value={formCategory} onChange={e => setFormCategory(e.target.value)} className={inputCls}>
+                  <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Category</label>
+                  <select required value={formCategory} onChange={e => setFormCategory(e.target.value)} className={inputCls} style={inputStyle}>
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5">Payment Method</label>
-                  <select value={formPayment} onChange={e => setFormPayment(e.target.value)} className={inputCls}>
+                  <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Payment Method</label>
+                  <select value={formPayment} onChange={e => setFormPayment(e.target.value)} className={inputCls} style={inputStyle}>
                     <option value="Chase Unlimited">Chase Unlimited</option>
                     <option value="Chase Flex">Chase Flex</option>
                   </select>
                 </div>
               </div>
               {formCategory && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-50 dark:bg-white/[0.04]">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                  style={{ backgroundColor: 'var(--color-muted-bg)' }}>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[formCategory] }} />
-                  <span className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                  <span className="text-[11px]" style={{ color: 'var(--color-fg)' }}>
                     {formMerchant || 'Merchant'} · {formCategory}{formAmount ? ` · -$${parseFloat(formAmount||0).toFixed(2)}` : ''}
                   </span>
                 </div>
               )}
               <div className="flex gap-3 pt-1">
                 <button type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[13px] font-semibold transition-colors">
+                  className="flex-1 py-2.5 rounded-xl text-white text-[13px] font-semibold transition-colors hover:opacity-90"
+                  style={{ backgroundColor: 'var(--color-primary)' }}>
                   Add Expense
                 </button>
                 <button type="button" onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.1] text-zinc-700 dark:text-zinc-300 text-[13px] font-semibold hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-colors">
+                  className="flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-colors"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                   Cancel
                 </button>
               </div>

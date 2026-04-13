@@ -150,9 +150,13 @@ function LeafLogo() {
   return (
     <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
       style={{ backgroundColor: '#3a7d54' }}>
-      <svg width="16" height="18" viewBox="0 0 16 18" fill="none">
-        <path d="M8 1C8 1 14 5.5 14 10.5C14 13.54 11.31 16 8 16C4.69 16 2 13.54 2 10.5C2 5.5 8 1 8 1Z" fill="white"/>
-        <line x1="8" y1="16" x2="8" y2="18" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <path d="M10 19C4 14 6 4 14 3C20 2 22 8 20 14C17 20 13 22 10 19Z"
+          stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M10 19C12 14 14 10 17 5"
+          stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M10 19C10 20 11 21.5 11 23"
+          stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
       </svg>
     </div>
   )
@@ -937,9 +941,13 @@ export default function App() {
                     ${totalSpent.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
                   </p>
                   <div className="mt-3 space-y-1">
+                    <p className="text-[11px] uppercase tracking-wide mb-2"
+                      style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+                      Credit / Debit Cards:
+                    </p>
                     {[
-                      { label: 'Flex',      color: 'hsl(25, 55%, 52%)',  source: 'Chase Flex'      },
-                      { label: 'Unlimited', color: 'hsl(145, 38%, 34%)', source: 'Chase Unlimited' },
+                      { label: 'Chase Freedom Flex',      color: 'hsl(25, 55%, 52%)',  source: 'Chase Flex'      },
+                      { label: 'Chase Freedom Unlimited', color: 'hsl(145, 38%, 34%)', source: 'Chase Unlimited' },
                     ].map(({ label, color, source }) => {
                       const amt = transactions.filter(t => t.source === source && t.amount < 0)
                         .reduce((s, t) => s + Math.abs(t.amount), 0)

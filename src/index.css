@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Smooth scroll removed — handled by JS easeInOutQuad in LandingPage */
+
 :root {
   --color-bg:         hsl(43, 35%, 95%);
   --color-bg-card:    hsl(43, 40%, 98%);
@@ -26,4 +28,26 @@ h1, h2, h3 {
 svg:focus,
 svg *:focus {
   outline: none;
+}
+
+/* ── Landing page entrance animations ─────────────────────────────────────── */
+@keyframes heroFadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.hero-animate {
+  opacity: 0;
+  animation: heroFadeUp 0.6s ease-out forwards;
+}
+
+/* Scroll-triggered fade-up for sections */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.animate-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
 }

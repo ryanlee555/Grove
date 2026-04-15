@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 
 // ─── JS smooth scroll (easeInOutQuad, ~800ms) ─────────────────────────────────
@@ -325,8 +325,9 @@ function HeroSlideshow() {
         ))}
       </div>
 
-      {/* Slide descriptions — between card and dots */}
-      <div className="relative mt-6" style={{ minHeight: '4.5em' }}>
+      {/* Slide descriptions + dots — pulled up to align with left-column CTAs */}
+      <div style={{ marginTop: '-24px' }}>
+      <div className="relative" style={{ minHeight: '4.5em' }}>
         {SLIDE_DESCRIPTIONS.map((desc, i) => (
           <p key={i}
             className="absolute inset-x-0 text-center"
@@ -355,6 +356,7 @@ function HeroSlideshow() {
             }} />
         ))}
       </div>
+      </div>{/* end pull-up wrapper */}
     </div>
   )
 }
@@ -400,6 +402,81 @@ function IconLock({ color }) {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
     </svg>
+  )
+}
+
+// ─── About photo carousel ─────────────────────────────────────────────────────
+const ABOUT_PHOTOS = [
+  '/RotateNumberOne.webp',
+  '/RotateNumberTwo.webp',
+  '/ROtateNumberThree.webp',
+  '/RotateNumber4.webp',
+  '/RotateNumber5.webp',
+  '/RotateNumber6.webp',
+]
+
+function PhotoCarousel() {
+  const [current, setCurrent] = useState(0)
+  const [animKey, setAnimKey] = useState(0)
+  const timerRef = useRef(null)
+
+  const go = useCallback((dir) => {
+    setCurrent(prev => (prev + dir + ABOUT_PHOTOS.length) % ABOUT_PHOTOS.length)
+    setAnimKey(k => k + 1)
+  }, [])
+
+  const resetTimer = useCallback(() => {
+    clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => go(1), 6000)
+  }, [go])
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => go(1), 6000)
+    return () => clearInterval(timerRef.current)
+  }, [go])
+
+  const prev = (current - 1 + ABOUT_PHOTOS.length) % ABOUT_PHOTOS.length
+
+  return (
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', borderRadius: 20, overflow: 'hidden', userSelect: 'none' }}>
+      {/* Previous photo acts as the visible stack underneath */}
+      <img src={ABOUT_PHOTOS[prev]} alt=""
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }} />
+      {/* Active photo slides in on top */}
+      <img key={animKey} src={ABOUT_PHOTOS[current]} alt="" className="photo-card-in"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 2 }} />
+      {/* Arrow buttons */}
+      <button onClick={() => { go(-1); resetTimer() }}
+        style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 4,
+          width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          backgroundColor: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(145,38%,34%)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <button onClick={() => { go(1); resetTimer() }}
+        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 4,
+          width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          backgroundColor: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(145,38%,34%)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+
+      {/* Dot indicators */}
+      <div style={{ position: 'absolute', bottom: 14, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 3 }}>
+        {ABOUT_PHOTOS.map((_, i) => (
+          <div key={i} onClick={() => { setCurrent(i); setAnimKey(k => k + 1); resetTimer() }}
+            style={{
+              width: i === current ? 18 : 6, height: 6, borderRadius: 3, cursor: 'pointer',
+              backgroundColor: i === current ? 'white' : 'rgba(255,255,255,0.55)',
+              transition: 'all 0.3s ease',
+            }} />
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -456,7 +533,6 @@ export default function LandingPage() {
   const NAV_LINKS = [
     { label: 'Features',     href: '#features'     },
     { label: 'How it works', href: '#how-it-works' },
-    { label: 'Pricing',      href: '#pricing'      },
     { label: 'About',        href: '#about'        },
   ]
 
@@ -520,7 +596,8 @@ export default function LandingPage() {
         }}>
         {/* Inner max-width wrapper */}
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" style={{ cursor: 'pointer' }}
+            onClick={() => smoothScrollTo(document.documentElement, 800)}>
             <LeafLogo px={40} />
             <span className="text-[18px] font-semibold"
               style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
@@ -555,14 +632,14 @@ export default function LandingPage() {
       </nav>
 
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden max-w-7xl mx-auto px-10 pt-16 pb-28">
+      <section className="relative overflow-hidden max-w-7xl mx-auto px-10 pt-16 pb-20">
         {/* Decorative circles */}
         <div className="absolute top-0 right-0 w-[520px] h-[520px] rounded-full pointer-events-none"
           style={{ backgroundColor: 'var(--color-muted-bg)', opacity: 0.55, transform: 'translate(30%, -30%)' }} />
         <div className="absolute top-24 right-40 w-[320px] h-[320px] rounded-full pointer-events-none"
           style={{ backgroundColor: 'var(--color-secondary)', opacity: 0.3, transform: 'translate(20%, -10%)' }} />
 
-        <div className="flex flex-col md:flex-row items-center md:items-end gap-16 relative z-10">
+        <div className="flex flex-col md:flex-row items-start gap-16 relative z-10">
           {/* Left — 60% */}
           <div className="flex-[3] min-w-0">
             {/* Pill label */}
@@ -599,7 +676,7 @@ export default function LandingPage() {
 
             {/* CTAs */}
             <div className="hero-animate flex flex-wrap items-center gap-4"
-              style={{ animationDelay: '300ms' }}>
+              style={{ animationDelay: '300ms', marginTop: '80px' }}>
               <Link to="/login"
                 className="px-8 py-4 rounded-full text-[16px] font-semibold text-white transition-opacity hover:opacity-90"
                 style={{ backgroundColor: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif", textDecoration: 'none' }}>
@@ -671,6 +748,41 @@ export default function LandingPage() {
           </div>
         </section>
       </div>
+
+      {/* ── About ──────────────────────────────────────────────────────────── */}
+      <section id="about" className="max-w-7xl mx-auto px-10 py-24">
+        <div className="animate-on-scroll rounded-2xl overflow-hidden flex flex-col md:flex-row"
+          style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-card)' }}>
+
+          {/* Left: photo carousel */}
+          <div className="flex-[5] min-w-0 p-6" style={{ minWidth: 0, maxWidth: 340 }}>
+            <PhotoCarousel />
+          </div>
+
+          {/* Right: personal note */}
+          <div className="flex-[7] min-w-0 p-10 flex flex-col justify-center"
+            style={{ borderLeft: '1px solid var(--color-border)' }}>
+            <h2 className="text-[32px] font-bold mb-6"
+              style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
+              Why I Built Grove
+            </h2>
+            <p className="text-[15px] leading-[1.8] mb-4"
+              style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+              Hey, I'm{' '}
+              <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Ryan</span>
+              {' '}— a broke college student who got tired of having no idea where his money was going. My bank would show me a long list of transactions and call it a day. That wasn't enough. I wanted to actually <em>see</em> it — like, where is my money <em>really</em> going every month?
+            </p>
+            <p className="text-[15px] leading-[1.8] mb-4"
+              style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+              So I built Grove. It started as a personal project to make sense of my own spending, and turned into something I genuinely use every week. It's not trying to be some enterprise finance tool. It's just clean, simple, and honest — the kind of thing I wish existed when I first got a credit card.
+            </p>
+            <p className="text-[15px] leading-[1.8]"
+              style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+              If you're a student, a young professional, or just someone who wants more clarity on their finances without the overwhelm, Grove was made for you.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* Divider */}
       <div className="max-w-7xl mx-auto px-10">

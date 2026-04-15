@@ -51,3 +51,12 @@ svg *:focus {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* Photo carousel card-stack entrance */
+@keyframes cardSlideIn {
+  from { transform: translateX(52px) scale(0.96); opacity: 0.75; }
+  to   { transform: translateX(0)    scale(1);    opacity: 1;    }
+}
+.photo-card-in {
+  animation: cardSlideIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

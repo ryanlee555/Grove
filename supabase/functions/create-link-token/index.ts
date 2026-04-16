@@ -42,12 +42,12 @@ Deno.serve(async (req) => {
     }
 
     // Call Plaid /link/token/create
-    const plaidRes = await fetch("https://sandbox.plaid.com/link/token/create", {
+    const plaidRes = await fetch("https://production.plaid.com/link/token/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: Deno.env.get("PLAID_CLIENT_ID"),
-        secret: Deno.env.get("PLAID_SANDBOX_SECRET"),
+        secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
         client_name: "Grove",
         user: { client_user_id: user.id },
         products: ["transactions"],

@@ -7,8 +7,8 @@ import {
 } from 'recharts'
 import { ChevronDown, X, Plus } from 'lucide-react'
 import { supabase } from './supabaseClient'
-import unlimitedRaw from './data/unlimited.CSV?raw'
-import flexRaw from './data/flex.CSV?raw'
+
+const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS = {
@@ -62,6 +62,12 @@ function getPresetRange(id) {
     default:           return { start: new Date(y,mo,1),     end: new Date(y,mo+1,0)   }
   }
 }
+// Plaid returns "YYYY-MM-DD", dashboard expects "MM/DD/YYYY"
+function plaidDateToTxDate(str) {
+  const [y, m, d] = str.split('-')
+  return `${m}/${d}/${y}`
+}
+
 function formatRangeLabel(preset, start, end) {
   if (preset === 'this-month' || preset === 'last-month')
     return start.toLocaleDateString('en-US', { month:'long', year:'numeric' })
@@ -754,23 +760,47 @@ export default function App() {
   const [formPayment,  setFormPayment]  = useState('Chase Unlimited')
   const [formAmount,   setFormAmount]   = useState('')
 
-  // Unified transaction store (CSV + manual), each tx has a stable id
-  const [allTx, setAllTx] = useState(() => {
-    const unlimitedRows = parseCSV(unlimitedRaw)
-    const flexRows      = parseCSV(flexRaw)
-    const toTx = (r, src) => ({
-      id:       nextId(),
-      date:     r['Transaction Date'],
-      merchant: decodeEntities(r['Description']),
-      category: categorize(decodeEntities(r['Description'])),
-      amount:   parseFloat(r['Amount']),
-      source:   src,
-    })
-    return [
-      ...unlimitedRows.filter(r => r['Type'] === 'Sale').map(r => toTx(r, 'Chase Unlimited')),
-      ...flexRows.filter(r => r['Type'] === 'Sale').map(r => toTx(r, 'Chase Flex')),
-    ]
-  })
+  // Unified transaction store (Plaid + manual), each tx has a stable id
+  const [allTx,    setAllTx]    = useState([])
+  const [txLoading, setTxLoading] = useState(true)
+  const [txError,   setTxError]   = useState('')
+
+  useEffect(() => {
+    async function loadTransactions() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setTxLoading(false); return }
+
+      const res = await fetch(GET_TRANSACTIONS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.transactions) {
+        setTxError('Failed to load transactions. Please refresh.')
+        setTxLoading(false)
+        return
+      }
+
+      const mapped = data.transactions.map(t => ({
+        id:       nextId(),
+        date:     plaidDateToTxDate(t.date),
+        merchant: t.merchant_name || t.name,
+        category: categorize(t.merchant_name || t.name),
+        amount:   -Math.abs(t.amount), // Plaid positive = debit; we use negative = debit
+        source:   'Other',
+      }))
+
+      setAllTx(mapped)
+      setTxLoading(false)
+    }
+
+    loadTransactions()
+  }, [])
 
   // Inline row editing
   const [expandedRow, setExpandedRow] = useState(null)
@@ -922,7 +952,22 @@ export default function App() {
         </header>
 
         {/* ── 2×2 grid ───────────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-hidden p-4">
+        <main className="flex-1 overflow-hidden p-4 relative">
+          {txLoading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center"
+              style={{ backgroundColor: 'var(--color-bg)' }}>
+              <p className="text-[14px]" style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+                Loading transactions…
+              </p>
+            </div>
+          )}
+          {txError && !txLoading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center">
+              <p className="text-[14px]" style={{ color: 'hsl(0,65%,50%)', fontFamily: "'DM Sans', sans-serif" }}>
+                {txError}
+              </p>
+            </div>
+          )}
           <div className="h-full grid grid-cols-2 grid-rows-2 gap-0">
 
             {/* Q1 — Total Spent */}

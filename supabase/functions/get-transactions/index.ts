@@ -61,18 +61,18 @@ Deno.serve(async (req) => {
 
     // Build date range: last 30 days
     const today = new Date()
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(today.getDate() - 30)
+    const oneYearAgo = new Date()
+    oneYearAgo.setDate(today.getDate() - 365)
 
     // Call Plaid /transactions/get
-    const plaidRes = await fetch("https://sandbox.plaid.com/transactions/get", {
+    const plaidRes = await fetch("https://production.plaid.com/transactions/get", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: Deno.env.get("PLAID_CLIENT_ID"),
-        secret: Deno.env.get("PLAID_SANDBOX_SECRET"),
+        secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
         access_token: tokenRow.access_token,
-        start_date: formatDate(thirtyDaysAgo),
+        start_date: formatDate(oneYearAgo),
         end_date: formatDate(today),
       }),
     })

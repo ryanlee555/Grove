@@ -51,12 +51,12 @@ Deno.serve(async (req) => {
     }
 
     // Exchange public token with Plaid
-    const plaidRes = await fetch("https://sandbox.plaid.com/item/public_token/exchange", {
+    const plaidRes = await fetch("https://production.plaid.com/item/public_token/exchange", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: Deno.env.get("PLAID_CLIENT_ID"),
-        secret: Deno.env.get("PLAID_SANDBOX_SECRET"),
+        secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
         public_token,
       }),
     })

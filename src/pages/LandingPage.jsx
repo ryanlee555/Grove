@@ -768,13 +768,11 @@ export default function LandingPage() {
             </h2>
             <p className="text-[15px] leading-[1.8] mb-4"
               style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
-              Hey, I'm{' '}
-              <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Ryan</span>
-              {' '}— a broke college student who got tired of having no idea where his money was going. My bank would show me a long list of transactions and call it a day. That wasn't enough. I wanted to actually <em>see</em> it — like, where is my money <em>really</em> going every month?
+              Hey! I'm Ryan, a broke college student who got tired of always having no idea where his money was going. My bank would show me a long list of transactions and call it a day, but that wasn't enough. I wanted to actually <em>see</em> it — like, where is my money really going every month?
             </p>
             <p className="text-[15px] leading-[1.8] mb-4"
               style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
-              So I built Grove. It started as a personal project to make sense of my own spending, and turned into something I genuinely use every week. It's not trying to be some enterprise finance tool. It's just clean, simple, and honest — the kind of thing I wish existed when I first got a credit card.
+              That's why I built Grove. Grove is a clean, simple, and transparent tool that shows exactly where your money is going, so you can have a clearer idea of how to budget more effectively. While it first started as a personal project to make sense of my own spending, Grove turned into something I genuinely utilize every week.
             </p>
             <p className="text-[15px] leading-[1.8]"
               style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
@@ -790,12 +788,37 @@ export default function LandingPage() {
       </div>
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
-      <footer className="max-w-7xl mx-auto px-10 py-8 flex items-center justify-center gap-3">
-        <LeafLogo px={28} />
-        <p className="text-[13px]"
-          style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
-          © 2026 Grove. Built for people who want to understand their money.
-        </p>
+      <footer className="max-w-7xl mx-auto px-10 py-10" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+          {/* Left: brand */}
+          <div className="flex items-center gap-3">
+            <LeafLogo px={28} />
+            <p className="text-[13px]" style={{ color: 'var(--color-muted-text)' }}>
+              © 2026 Grove. Built for people who want to understand their money.
+            </p>
+          </div>
+
+          {/* Right: contact */}
+          <div className="flex flex-col items-center md:items-end gap-2">
+            <p className="text-[13px] font-semibold" style={{ color: 'var(--color-fg)' }}>Any questions?</p>
+            <p className="text-[13px]" style={{ color: 'var(--color-muted-text)' }}>
+              Reach out to me at{' '}
+              <a href="mailto:ryan.lee55@berkeley.edu"
+                className="hover:underline"
+                style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
+                ryan.lee55@berkeley.edu
+              </a>
+            </p>
+            <a href="https://www.linkedin.com/in/ryan-lee-uc-berkeley/" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 hover:underline"
+              style={{ color: 'var(--color-primary)', textDecoration: 'none', fontSize: 13 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="hsl(145,38%,34%)">
+                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+              </svg>
+              Connect on LinkedIn
+            </a>
+          </div>
+        </div>
       </footer>
 
     </div>

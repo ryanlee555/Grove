@@ -1,10 +1,12 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   PieChart, Pie, Cell, Sector, Tooltip,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line,
 } from 'recharts'
 import { ChevronDown, X, Plus } from 'lucide-react'
+import { supabase } from './supabaseClient'
 import unlimitedRaw from './data/unlimited.CSV?raw'
 import flexRaw from './data/flex.CSV?raw'
 
@@ -721,8 +723,14 @@ function CategorySection({ byCategory, totalSpent, transactions }) {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef(null)
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    navigate('/', { replace: true })
+  }
 
   // Table sort
   const [sortCol, setSortCol] = useState('date')
@@ -906,7 +914,7 @@ export default function App() {
                   </div>
                   <button className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
                     style={{ color: 'var(--color-fg)' }}>Settings</button>
-                  <button className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80">Sign out</button>
+                  <button onClick={handleSignOut} className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80">Sign out</button>
                 </div>
               )}
             </div>

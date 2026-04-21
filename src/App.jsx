@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 import { ChevronDown, X, Plus } from 'lucide-react'
 import { supabase } from './supabaseClient'
+import LeafIcon from './components/LeafIcon'
 
 const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
@@ -153,22 +154,6 @@ function decodeEntities(s) {
   return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
 }
 
-// ─── Grove leaf logo ──────────────────────────────────────────────────────────
-function LeafLogo() {
-  return (
-    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-      style={{ backgroundColor: '#3a7d54' }}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-        <path d="M10 19C4 14 6 4 14 3C20 2 22 8 20 14C17 20 13 22 10 19Z"
-          stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M10 19C12 14 14 10 17 5"
-          stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-        <path d="M10 19C10 20 11 21.5 11 23"
-          stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-      </svg>
-    </div>
-  )
-}
 
 // ─── Shared components ────────────────────────────────────────────────────────
 function Card({ title, action, children, divider = false, colDivider = false }) {
@@ -916,7 +901,7 @@ export default function App() {
         <header className="shrink-0 relative z-10 px-7 py-3.5 flex items-center justify-between"
           style={{ backgroundColor: 'var(--color-bg)' }}>
           <div className="flex items-center gap-3">
-            <LeafLogo />
+            <LeafIcon size={32} />
             <div>
               <h1 className="text-[17px] font-semibold leading-none" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>Grove</h1>
               <p className="text-[11px] mt-0.5 leading-none" style={{ color: 'var(--color-muted-text)' }}>Grow your wealth, naturally.</p>

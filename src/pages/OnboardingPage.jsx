@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePlaidLink } from 'react-plaid-link'
 import { supabase } from '../supabaseClient'
-import LeafLogo from '../components/LeafLogo'
+import LeafIcon from '../components/LeafIcon'
 
 const FUNCTIONS_BASE = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1'
 
@@ -96,7 +96,7 @@ export default function OnboardingPage() {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 32 }}>
-          <LeafLogo px={36} />
+          <LeafIcon size={32} />
           <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 600, color: 'var(--color-fg)' }}>
             Grove
           </span>

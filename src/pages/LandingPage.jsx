@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts'
+import LeafIcon from '../components/LeafIcon'
 
 // ─── JS smooth scroll (easeInOutQuad, ~800ms) ─────────────────────────────────
 function smoothScrollTo(element, duration = 800) {
@@ -17,22 +19,6 @@ function smoothScrollTo(element, duration = 800) {
   requestAnimationFrame(step)
 }
 
-// ─── Updated leaf logo (new SVG path) ────────────────────────────────────────
-function LeafLogo({ px = 40 }) {
-  return (
-    <div className="rounded-full flex items-center justify-center shrink-0"
-      style={{ width: px, height: px, backgroundColor: '#3a7d54' }}>
-      <svg viewBox="0 0 24 24" fill="none" style={{ width: px * 0.62, height: px * 0.62 }}>
-        <path d="M10 19C4 14 6 4 14 3C20 2 22 8 20 14C17 20 13 22 10 19Z"
-          stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M10 19C12 14 14 10 17 5"
-          stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-        <path d="M10 19C10 20 11 21.5 11 23"
-          stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-      </svg>
-    </div>
-  )
-}
 
 // ─── Mock bar chart ───────────────────────────────────────────────────────────
 const BAR_DATA = [
@@ -526,6 +512,241 @@ function Step({ num, title, body, delay = 0 }) {
   )
 }
 
+// ─── How It Works — Spending Breakdown Card ──────────────────────────────────
+const SPENDING_DATA = [
+  { name: 'Housing',       value: 33 },
+  { name: 'Food & Dining', value: 22 },
+  { name: 'Transport',     value: 14 },
+  { name: 'Shopping',      value: 18 },
+  { name: 'Other',         value: 13 },
+]
+const SPENDING_COLORS = [
+  'hsl(145,42%,26%)',
+  'hsl(145,35%,40%)',
+  'hsl(140,22%,54%)',
+  'hsl(140,18%,70%)',
+  'hsl(140,10%,85%)',
+]
+
+function DonutCenterLabel({ viewBox }) {
+  const { cx, cy } = viewBox
+  return (
+    <g>
+      <text x={cx} y={cy - 7} textAnchor="middle"
+        style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Playfair Display', serif", fill: 'hsl(150,22%,14%)' }}>
+        $4,280
+      </text>
+      <text x={cx} y={cy + 10} textAnchor="middle"
+        style={{ fontSize: 10, fontFamily: "'DM Sans', sans-serif", fill: 'hsl(145,14%,46%)' }}>
+        this month
+      </text>
+    </g>
+  )
+}
+
+function SpendingBreakdownCard() {
+  return (
+    <div className="rounded-2xl p-5"
+      style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] mb-4"
+        style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+        Spending Breakdown
+      </p>
+      <div className="flex items-center gap-5">
+        <div style={{ width: 160, height: 160, flexShrink: 0 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={SPENDING_DATA} cx="50%" cy="50%" innerRadius={50} outerRadius={74}
+                dataKey="value" startAngle={90} endAngle={-270} stroke="none">
+                {SPENDING_DATA.map((_, i) => <Cell key={i} fill={SPENDING_COLORS[i]} />)}
+                <Label content={<DonutCenterLabel />} />
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+          {SPENDING_DATA.map((d, i) => (
+            <div key={d.name} className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: SPENDING_COLORS[i] }} />
+              <span className="text-[12px] flex-1 truncate"
+                style={{ color: 'var(--color-fg)', fontFamily: "'DM Sans', sans-serif" }}>
+                {d.name}
+              </span>
+              <span className="text-[12px] font-semibold tabular-nums"
+                style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+                {d.value}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── How It Works — Budget Tracker Card ──────────────────────────────────────
+const BUDGET_DATA = [
+  { label: 'Groceries',     spent: 340, total: 400 },
+  { label: 'Dining out',    spent: 180, total: 200 },
+  { label: 'Entertainment', spent: 62,  total: 150 },
+  { label: 'Subscriptions', spent: 88,  total: 100 },
+]
+
+function BudgetTrackerCard() {
+  return (
+    <div className="rounded-2xl p-5"
+      style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] mb-4"
+        style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+        Budget Tracker
+      </p>
+      <div className="flex flex-col gap-4">
+        {BUDGET_DATA.map(({ label, spent, total }) => {
+          const pct = Math.round((spent / total) * 100)
+          const isWarn = pct > 85
+          const barColor = isWarn ? 'hsl(16,80%,52%)' : 'hsl(145,38%,34%)'
+          const amountColor = isWarn ? 'hsl(16,80%,52%)' : 'var(--color-fg)'
+          return (
+            <div key={label}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[13px] font-medium"
+                  style={{ color: 'var(--color-fg)', fontFamily: "'DM Sans', sans-serif" }}>
+                  {label}
+                </span>
+                <span className="text-[12px] font-semibold tabular-nums"
+                  style={{ color: amountColor, fontFamily: "'DM Sans', sans-serif" }}>
+                  ${spent}{' '}
+                  <span style={{ color: 'var(--color-muted-text)', fontWeight: 400 }}>/ ${total}</span>
+                </span>
+              </div>
+              <div className="w-full rounded-full overflow-hidden"
+                style={{ height: 5, backgroundColor: 'var(--color-muted-bg)' }}>
+                <div className="h-full rounded-full"
+                  style={{ width: `${pct}%`, backgroundColor: barColor }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── How It Works — two-column layout with scroll animations ─────────────────
+function HowItWorksSection() {
+  const card1Ref = useRef(null)
+  const card2Ref = useRef(null)
+  const [card1Visible, setCard1Visible] = useState(false)
+  const [card2Visible, setCard2Visible] = useState(false)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => entries.forEach(e => {
+        if (e.isIntersecting) {
+          if (e.target === card1Ref.current) setCard1Visible(true)
+          if (e.target === card2Ref.current) setCard2Visible(true)
+        }
+      }),
+      { threshold: 0.12 }
+    )
+    if (card1Ref.current) observer.observe(card1Ref.current)
+    if (card2Ref.current) observer.observe(card2Ref.current)
+    return () => observer.disconnect()
+  }, [])
+
+  const steps = [
+    {
+      num: '01', filled: true,
+      title: 'Connect your accounts',
+      body: 'Link any US bank, credit card, or investment account in seconds using Plaid — fully secure, read-only access.',
+    },
+    {
+      num: '02', filled: false,
+      title: 'We do the analysis',
+      body: 'Grove automatically categorizes every transaction and builds a complete picture of your financial life.',
+    },
+    {
+      num: '03', filled: false,
+      title: 'You gain clarity',
+      body: 'View beautiful dashboards, set budgets, and watch your savings grow — all updated in real time.',
+    },
+  ]
+
+  return (
+    <div style={{ background: 'linear-gradient(to bottom, hsl(140, 16%, 92%), var(--color-bg))', position: 'relative', overflow: 'hidden' }}>
+      <div className="absolute pointer-events-none rounded-full"
+        style={{ width: 520, height: 520, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'var(--color-secondary)', opacity: 0.15, zIndex: 0 }} />
+      <section id="how-it-works" className="max-w-7xl mx-auto px-10 py-24" style={{ position: 'relative', zIndex: 1 }}>
+        <div className="flex flex-col lg:flex-row gap-16 items-center">
+
+          {/* Left column */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] mb-5"
+              style={{ color: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif" }}>
+              How it works
+            </p>
+            <h2 className="animate-on-scroll font-bold leading-[1.15] mb-12"
+              style={{
+                color: 'var(--color-fg)',
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 'clamp(30px, 3.2vw, 42px)',
+                maxWidth: 420,
+              }}>
+              Set up in minutes. Benefits for a lifetime.
+            </h2>
+            <div className="flex flex-col gap-8">
+              {steps.map(({ num, filled, title, body }) => (
+                <div key={num} className="animate-on-scroll flex items-start gap-5">
+                  <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{
+                      backgroundColor: filled ? 'hsl(145,38%,28%)' : 'transparent',
+                      border: filled ? 'none' : '1.5px solid hsl(140,20%,72%)',
+                    }}>
+                    <span className="text-[12px] font-bold tabular-nums"
+                      style={{ color: filled ? 'white' : 'hsl(145,20%,50%)', fontFamily: "'DM Sans', sans-serif" }}>
+                      {num}
+                    </span>
+                  </div>
+                  <div className="pt-1.5">
+                    <h3 className="text-[16px] font-semibold mb-1"
+                      style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
+                      {title}
+                    </h3>
+                    <p className="text-[14px] leading-relaxed"
+                      style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+                      {body}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right column — two stacked preview cards */}
+          <div className="flex-1 min-w-0 flex flex-col gap-5 w-full">
+            <div ref={card1Ref} style={{
+              transform: card1Visible ? 'translateX(0)' : 'translateX(40px)',
+              opacity: card1Visible ? 1 : 0,
+              transition: 'transform 600ms ease-out, opacity 600ms ease-out',
+            }}>
+              <SpendingBreakdownCard />
+            </div>
+            <div ref={card2Ref} style={{
+              transform: card2Visible ? 'translateX(0)' : 'translateX(40px)',
+              opacity: card2Visible ? 1 : 0,
+              transition: 'transform 600ms ease-out, opacity 600ms ease-out',
+              transitionDelay: '150ms',
+            }}>
+              <BudgetTrackerCard />
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </div>
+  )
+}
+
 // ─── Main landing page ────────────────────────────────────────────────────────
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
@@ -598,7 +819,7 @@ export default function LandingPage() {
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
           <div className="flex items-center gap-3" style={{ cursor: 'pointer' }}
             onClick={() => smoothScrollTo(document.documentElement, 800)}>
-            <LeafLogo px={40} />
+            <LeafIcon size={32} />
             <span className="text-[18px] font-semibold"
               style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
               Grove
@@ -725,29 +946,7 @@ export default function LandingPage() {
       </div>
 
       {/* ── How it works ───────────────────────────────────────────────────── */}
-      <div style={{ background: 'linear-gradient(to bottom, hsl(140, 16%, 92%), var(--color-bg))', position: 'relative', overflow: 'hidden' }}>
-        {/* Decorative circle */}
-        <div className="absolute pointer-events-none rounded-full" style={{ width: 520, height: 520, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'var(--color-secondary)', opacity: 0.15, zIndex: 0 }} />
-        <section id="how-it-works" className="max-w-7xl mx-auto px-10 py-24" style={{ position: 'relative', zIndex: 1 }}>
-          <h2 className="animate-on-scroll text-[38px] font-bold mb-16 text-center"
-            style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
-            How it works
-          </h2>
-          <div className="flex flex-col md:flex-row gap-8 relative">
-            <div className="hidden md:block absolute top-8 left-[16.66%] right-[16.66%] pointer-events-none"
-              style={{ height: 1, backgroundColor: 'var(--color-border)' }} />
-            <Step num="01" title="Connect your bank"
-              body="Securely link your accounts in seconds. Grove uses bank-level encryption to keep your data safe."
-              delay={0} />
-            <Step num="02" title="Grove categorizes everything"
-              body="Transactions are automatically sorted by category — food, transport, subscriptions, and more."
-              delay={100} />
-            <Step num="03" title="You get clarity"
-              body="See your full spending picture at a glance. Know where every dollar goes, every month."
-              delay={200} />
-          </div>
-        </section>
-      </div>
+      <HowItWorksSection />
 
       {/* ── About ──────────────────────────────────────────────────────────── */}
       <section id="about" className="max-w-7xl mx-auto px-10 py-24">
@@ -792,7 +991,7 @@ export default function LandingPage() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           {/* Left: brand */}
           <div className="flex items-center gap-3">
-            <LeafLogo px={28} />
+            <LeafIcon size={32} />
             <p className="text-[13px]" style={{ color: 'var(--color-muted-text)' }}>
               © 2026 Grove. Built for people who want to understand their money.
             </p>

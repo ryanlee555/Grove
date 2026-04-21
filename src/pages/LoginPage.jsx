@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import LeafLogo from '../components/LeafLogo'
+import LeafIcon from '../components/LeafIcon'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -39,7 +39,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 32 }}>
-          <LeafLogo px={36} />
+          <LeafIcon size={32} />
           <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 600, color: 'var(--color-fg)' }}>
             Grove
           </span>

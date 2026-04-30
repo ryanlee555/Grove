@@ -18,7 +18,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get authenticated user by forwarding the Bearer token through the client
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
@@ -53,6 +52,7 @@ Deno.serve(async (req) => {
         products: ["transactions"],
         country_codes: ["US"],
         language: "en",
+        redirect_uri: "https://v0-financial-dashboard-functiona-lilac-six.vercel.app/oauth-callback",
       }),
     })
 

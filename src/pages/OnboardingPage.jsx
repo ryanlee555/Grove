@@ -13,7 +13,27 @@ export default function OnboardingPage() {
   const [error, setError] = useState('')
   const [exchanging, setExchanging] = useState(false)
 
-  // Fetch link token on mount — wait for INITIAL_SESSION so the token is guaranteed loaded
+  const fetchLinkToken = async (session) => {
+    const res = await fetch(`${FUNCTIONS_BASE}/create-link-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+    })
+
+    const data = await res.json()
+
+    if (!res.ok || !data.link_token) {
+      setError('Failed to initialize Plaid. Please try again.')
+      setLoading(false)
+      return
+    }
+
+    setLinkToken(data.link_token)
+    setLoading(false)
+  }
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event !== 'INITIAL_SESSION') return
@@ -24,31 +44,34 @@ export default function OnboardingPage() {
         return
       }
 
-      const res = await fetch(`${FUNCTIONS_BASE}/create-link-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      })
+      // Check if returning from OAuth redirect (Chase etc.)
+      const params = new URLSearchParams(window.location.search)
+      const oauthStateToken = params.get('oauth_state_id')
 
-      const data = await res.json()
-
-      if (!res.ok || !data.link_token) {
-        setError('Failed to initialize Plaid. Please try again.')
-        setLoading(false)
-        return
+      if (oauthStateToken) {
+        // Re-use the stored link token from sessionStorage
+        const storedToken = sessionStorage.getItem('plaid_link_token')
+        if (storedToken) {
+          setLinkToken(storedToken)
+          setLoading(false)
+          return
+        }
       }
 
-      setLinkToken(data.link_token)
-      setLoading(false)
+      await fetchLinkToken(session)
     })
 
     return () => subscription.unsubscribe()
   }, [navigate])
 
-  // Handle Plaid Link success
-  const onSuccess = useCallback(async (public_token) => {
+  // Store link token for OAuth redirect recovery
+  useEffect(() => {
+    if (linkToken) {
+      sessionStorage.setItem('plaid_link_token', linkToken)
+    }
+  }, [linkToken])
+
+  const onSuccess = useCallback(async (public_token, metadata) => {
     setExchanging(true)
     setError('')
 
@@ -64,7 +87,11 @@ export default function OnboardingPage() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ public_token }),
+      body: JSON.stringify({
+        public_token,
+        institution_id: metadata?.institution?.institution_id,
+        institution_name: metadata?.institution?.name,
+      }),
     })
 
     const data = await res.json()
@@ -75,13 +102,25 @@ export default function OnboardingPage() {
       return
     }
 
+    sessionStorage.removeItem('plaid_link_token')
     navigate('/dashboard', { replace: true })
   }, [navigate])
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
     onSuccess,
+    // Required for OAuth banks like Chase
+    receivedRedirectUri: window.location.href.includes('oauth_state_id')
+      ? window.location.href
+      : undefined,
   })
+
+  // Auto-open if returning from OAuth redirect
+  useEffect(() => {
+    if (ready && window.location.href.includes('oauth_state_id')) {
+      open()
+    }
+  }, [ready, open])
 
   return (
     <div style={{
@@ -110,7 +149,6 @@ export default function OnboardingPage() {
           padding: '40px 36px',
           textAlign: 'center',
         }}>
-          {/* Lock icon */}
           <div style={{
             width: 52, height: 52, borderRadius: 14,
             backgroundColor: 'hsl(140,30%,88%)',
@@ -174,7 +212,6 @@ export default function OnboardingPage() {
             {loading ? 'Loading…' : exchanging ? 'Connecting…' : 'Connect your bank'}
           </button>
 
-          {/* Plaid trust badge */}
           <p style={{
             fontFamily: "'DM Sans', sans-serif",
             fontSize: 12,

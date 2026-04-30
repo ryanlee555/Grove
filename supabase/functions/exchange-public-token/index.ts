@@ -18,7 +18,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get authenticated user by forwarding the Bearer token through the client
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
@@ -41,8 +40,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Parse request body
-    const { public_token } = await req.json()
+    // Parse request body — now also accepts institution info
+    const { public_token, institution_id, institution_name } = await req.json()
     if (!public_token) {
       return new Response(JSON.stringify({ error: "Missing public_token" }), {
         status: 400,
@@ -72,14 +71,15 @@ Deno.serve(async (req) => {
 
     const { access_token, item_id } = plaidData
 
-    // Use service role client for the DB write so it bypasses RLS
     const adminSupabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     )
+
+    // Insert (not upsert) so each bank gets its own row
     const { error: dbError } = await adminSupabase
       .from("plaid_tokens")
-      .upsert({ user_id: user.id, access_token, item_id })
+      .insert({ user_id: user.id, access_token, item_id, institution_id, institution_name })
 
     if (dbError) {
       return new Response(JSON.stringify({ error: dbError.message }), {

@@ -22,7 +22,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get authenticated user by forwarding the Bearer token through the client
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
@@ -45,48 +44,60 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Look up user's access_token from plaid_tokens table
-    const { data: tokenRow, error: tokenError } = await supabase
+    // Fetch ALL token rows for this user (one per bank)
+    const { data: tokenRows, error: tokenError } = await supabase
       .from("plaid_tokens")
-      .select("access_token")
+      .select("access_token, institution_name")
       .eq("user_id", user.id)
-      .maybeSingle()
 
-    if (tokenError || !tokenRow) {
+    if (tokenError || !tokenRows || tokenRows.length === 0) {
       return new Response(JSON.stringify({ error: "No linked bank account found" }), {
         status: 404,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       })
     }
 
-    // Build date range: last 30 days
+    // Build date range: last 365 days
     const today = new Date()
     const oneYearAgo = new Date()
     oneYearAgo.setDate(today.getDate() - 365)
 
-    // Call Plaid /transactions/get
-    const plaidRes = await fetch("https://production.plaid.com/transactions/get", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: Deno.env.get("PLAID_CLIENT_ID"),
-        secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
-        access_token: tokenRow.access_token,
-        start_date: formatDate(oneYearAgo),
-        end_date: formatDate(today),
-      }),
-    })
+    // Fetch transactions from each bank and combine
+    const allTransactions = []
 
-    const plaidData = await plaidRes.json()
-
-    if (!plaidRes.ok) {
-      return new Response(JSON.stringify({ error: plaidData }), {
-        status: 502,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    for (const tokenRow of tokenRows) {
+      const plaidRes = await fetch("https://production.plaid.com/transactions/get", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: Deno.env.get("PLAID_CLIENT_ID"),
+          secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
+          access_token: tokenRow.access_token,
+          start_date: formatDate(oneYearAgo),
+          end_date: formatDate(today),
+        }),
       })
+
+      const plaidData = await plaidRes.json()
+
+      if (!plaidRes.ok) {
+        console.error(`Plaid error for ${tokenRow.institution_name}:`, plaidData)
+        continue // skip failed banks, don't crash the whole request
+      }
+
+      // Tag each transaction with its institution name
+      const tagged = plaidData.transactions.map((t: any) => ({
+        ...t,
+        institution_name: tokenRow.institution_name,
+      }))
+
+      allTransactions.push(...tagged)
     }
 
-    return new Response(JSON.stringify({ transactions: plaidData.transactions }), {
+    // Sort combined transactions by date descending
+    allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    return new Response(JSON.stringify({ transactions: allTransactions }), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     })
   } catch (err) {

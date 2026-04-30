@@ -772,12 +772,13 @@ export default function App() {
       }
 
       const mapped = data.transactions.map(t => ({
-        id:       nextId(),
-        date:     plaidDateToTxDate(t.date),
-        merchant: t.merchant_name || t.name,
-        category: categorize(t.merchant_name || t.name),
-        amount:   -Math.abs(t.amount), // Plaid positive = debit; we use negative = debit
-        source:   'Other',
+        id:               nextId(),
+        date:             plaidDateToTxDate(t.date),
+        merchant:         t.merchant_name || t.name,
+        category:         categorize(t.merchant_name || t.name),
+        amount:           -Math.abs(t.amount),
+        source:           'Other',
+        institution_name: t.institution_name ?? null,
       }))
 
       setAllTx(mapped)
@@ -908,6 +909,14 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate('/onboarding')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-colors"
+              style={{ backgroundColor: 'var(--color-muted-bg)', color: 'var(--color-fg)' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}>
+              <Plus size={11} /> Add bank
+            </button>
             <div className="relative group">
               <button className="w-9 h-9 flex items-center justify-center rounded-xl text-lg transition-colors"
                 style={{ color: 'var(--color-muted-text)' }}>💵</button>
@@ -1081,6 +1090,9 @@ export default function App() {
                             <td className="py-2 pr-3 text-[11px] whitespace-nowrap tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</td>
                             <td className="py-2 pr-3 max-w-[130px]">
                               <span className="block truncate text-[12px] font-medium" style={{ color: 'var(--color-fg)' }} title={t.merchant}>{t.merchant}</span>
+                              {t.institution_name && (
+                              <span className="block truncate text-[10px]" style={{ color: 'var(--color-muted-text)' }}>{t.institution_name}</span>
+                              )}
                             </td>
                             <td className="py-2 pr-3">
                               <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"

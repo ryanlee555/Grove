@@ -115,29 +115,32 @@ function computeWeeklyBuckets(allTx, rangeStart, rangeEnd) {
 }
 
 // ─── Keyword category mapping ─────────────────────────────────────────────────
-function categorize(raw) {
-  const d = raw.toUpperCase()
-  if (/NETFLIX|SPOTIFY|HULU|DISNEY\+|APPLE\.COM\/BILL|AMAZON PRIME/.test(d)) return 'Subscriptions'
-  if (/OPENAI|CHATGPT|CLAUDE\.AI/.test(d))                                     return 'Subscriptions'
-  if (/GYMPASS/.test(d))                                                        return 'Subscriptions'
-  if (/UBER.*(ONE|MEMBERSHIP)/.test(d))                                         return 'Subscriptions'
-  if (/^TM \*|TICKETMASTER|^FGT\*|NITEHARTS|EDCVEGAS/.test(d))                 return 'Events'
-  if (/AIRBNB|ALASKA AIR|ALASKA A\b|LA QUINTA|MARRIOTT|HILTON|HYATT|EXPEDIA/.test(d)) return 'Travel'
-  if (/UBER.*TRIP|LYFT/.test(d))                                                return 'Transport'
-  if (/CLIPPER|FASTRAK|BART|CALTRAIN/.test(d))                                  return 'Transport'
-  if (/GASOLINE|COSTCO GAS|CHEVRON|ARCO|SHELL|EXXON|MOBIL/.test(d))            return 'Transport'
-  if (/PARKING|GARAGE/.test(d))                                                 return 'Transport'
-  if (/TAP HAUS|HANSHIN POCHA/.test(d))                                         return 'Nightlife'
-  if (/COSTCO WHSE|TRADER JOE|WHOLE FOODS|SAFEWAY|KROGER|WALMART|KATHMANDU MARKET|BRUNO.S MARKET|SPROUTS|ALDI/.test(d)) return 'Groceries'
-  if (/CHIPOTLE|TACO BELL|IN-N-OUT|MCDONALD|WENDY|SUBWAY|STARBUCKS/.test(d))   return 'Food & Dining'
-  if (/DOORDASH|DD \*DOORDASH|GRUBHUB|UBEREATS/.test(d))                        return 'Food & Dining'
-  if (/BAKERY|CAFE|COFFEE|BOBA|SUSHI|PHO|RAMEN|BURGER|PIZZA|NOODLE|GRILL|BISTRO|RESTAURANT|KITCHEN|CANTINA|DINER|RISTORANTE/.test(d)) return 'Food & Dining'
-  if (/MATCHA|TEA|JUICE|YOGURT|ICE CREAM|CREAMERY|MALA|WINGS|GUKBAP|POCHA/.test(d)) return 'Food & Dining'
-  if (/^SNACK\*|^TST\*|^HFS |^BCD-|JOE.*JUICE|85C |MENCHIE|PLENTEA|CHICK N|KUNG FU|SOMISOMI/.test(d)) return 'Food & Dining'
-  if (/^SQ \*/.test(d) && !/SHOP|MARKET|STUDIO|SALON/.test(d))                 return 'Food & Dining'
-  if (/TIKTOK SHOP|AMAZON(?! PRIME)|UNIQLO|WEVERSE|DEPOP|EBAY|ETSY/.test(d))   return 'Shopping'
-  if (/WALGREENS|CVS|KNOTTY SHOP/.test(d))                                      return 'Shopping'
-  if (/AT&T|VERIZON|COMCAST|PG&E|UTILITY|ELECTRICITY|WATER BILL/.test(d))      return 'Bills & Utilities'
+function plaidCategoryToGrove(detailed = '', name = '') {
+  const d = detailed.toUpperCase()
+  const n = name.toUpperCase()
+
+  if (/RESTAURANT|FAST_FOOD|COFFEE|FOOD_AND_DRINK|DINING|BAKERY|BAR|JUICE|FOOD_DELIVERY/.test(d)) return 'Food & Dining'
+  if (/GROCERIES|SUPERMARKET|FARMERS_MARKET/.test(d)) return 'Groceries'
+  if (/TAXI|RIDE|TRANSIT|GAS|PARKING|AUTO|AIRLINE|FERRY|SUBWAY|TRAIN|TOLL|FUEL|TRANSPORT/.test(d)) return 'Transport'
+  if (/TRAVEL|HOTEL|LODGING|HOSTEL|MOTEL|AIRBNB|VACATION|FLIGHT/.test(d)) return 'Travel'
+  if (/SUBSCRIPTION|STREAMING|DIGITAL|SOFTWARE|INTERNET|CABLE|PHONE|WIRELESS/.test(d)) return 'Subscriptions'
+  if (/ENTERTAINMENT|EVENT|TICKET|CONCERT|SPORT|MOVIE|MUSEUM|AMUSEMENT/.test(d)) return 'Events'
+  if (/NIGHTLIFE|DRINKING|CLUB|LOUNGE/.test(d)) return 'Nightlife'
+  if (/SHOPS|RETAIL|CLOTHING|ELECTRONICS|ONLINE_MARKETPLACE|DEPARTMENT_STORE|AMAZON|MARKETPLACE/.test(d)) return 'Shopping'
+  if (/UTILITIES|ELECTRIC|WATER|GAS_UTILITIES|INTERNET_SERVICE|PHONE_SERVICE/.test(d)) return 'Bills & Utilities'
+
+  // Fall back to keyword matching on merchant name
+  const up = n.toUpperCase()
+  if (/NETFLIX|SPOTIFY|HULU|DISNEY|APPLE\.COM\/BILL|AMAZON PRIME|OPENAI|CHATGPT|CLAUDE|GYMPASS/.test(up)) return 'Subscriptions'
+  if (/TICKETMASTER|EDCVEGAS|NITEHARTS/.test(up)) return 'Events'
+  if (/AIRBNB|ALASKA AIR|MARRIOTT|HILTON|HYATT|EXPEDIA/.test(up)) return 'Travel'
+  if (/UBER|LYFT|CLIPPER|FASTRAK|BART|CALTRAIN|PARKING|CHEVRON|ARCO|SHELL/.test(up)) return 'Transport'
+  if (/TAP HAUS|HANSHIN POCHA/.test(up)) return 'Nightlife'
+  if (/COSTCO|TRADER JOE|WHOLE FOODS|SAFEWAY|KROGER|WALMART|SPROUTS/.test(up)) return 'Groceries'
+  if (/CHIPOTLE|TACO BELL|STARBUCKS|DOORDASH|GRUBHUB|UBEREATS|RESTAURANT|CAFE|COFFEE|SUSHI|PIZZA/.test(up)) return 'Food & Dining'
+  if (/AMAZON|UNIQLO|EBAY|ETSY|TIKTOK SHOP/.test(up)) return 'Shopping'
+  if (/AT&T|VERIZON|COMCAST|PG&E/.test(up)) return 'Bills & Utilities'
+
   return 'Miscellaneous'
 }
 
@@ -782,7 +785,7 @@ export default function App() {
           id:               nextId(),
           date:             plaidDateToTxDate(t.date),
           merchant:         t.merchant_name || t.name,
-          category:         categorize(t.merchant_name || t.name),
+          category:         plaidCategoryToGrove(t.personal_finance_category?.detailed ?? '', t.merchant_name || t.name),
           amount:           -t.amount, // Plaid positive = debit, negative = credit
           source:           'Other',
           institution_name: t.institution_name ?? null,

@@ -66,27 +66,39 @@ Deno.serve(async (req) => {
     const allTransactions = []
 
     for (const tokenRow of tokenRows) {
-      const plaidRes = await fetch("https://production.plaid.com/transactions/get", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: Deno.env.get("PLAID_CLIENT_ID"),
-          secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
-          access_token: tokenRow.access_token,
-          start_date: formatDate(oneYearAgo),
-          end_date: formatDate(today),
-        }),
-      })
+      // Paginate through all transactions
+      let allBankTransactions: any[] = []
+      let offset = 0
+      const count = 500
 
-      const plaidData = await plaidRes.json()
+      while (true) {
+        const plaidRes = await fetch("https://production.plaid.com/transactions/get", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_id: Deno.env.get("PLAID_CLIENT_ID"),
+            secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
+            access_token: tokenRow.access_token,
+            start_date: formatDate(oneYearAgo),
+            end_date: formatDate(today),
+            options: { count, offset },
+          }),
+        })
 
-      if (!plaidRes.ok) {
-        console.error(`Plaid error for ${tokenRow.institution_name}:`, plaidData)
-        continue // skip failed banks, don't crash the whole request
+        const plaidData = await plaidRes.json()
+
+        if (!plaidRes.ok) {
+          console.error(`Plaid error for ${tokenRow.institution_name}:`, plaidData)
+          break
+        }
+
+        allBankTransactions.push(...plaidData.transactions)
+
+        if (allBankTransactions.length >= plaidData.total_transactions) break
+        offset += count
       }
 
-      // Tag each transaction with its institution name
-      const tagged = plaidData.transactions.map((t: any) => ({
+      const tagged = allBankTransactions.map((t: any) => ({
         ...t,
         institution_name: tokenRow.institution_name,
       }))

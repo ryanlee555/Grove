@@ -31,11 +31,11 @@ let _txId = 0
 const nextId = () => ++_txId
 
 const PRESETS = [
-  { id: 'this-month', label: 'This Month'   },
-  { id: 'last-month', label: 'Last Month'   },
-  { id: 'last-30',    label: 'Last 30 Days' },
-  { id: 'last-90',    label: 'Last 90 Days' },
-  { id: 'ytd',        label: 'Year to Date' },
+  { id: 'this-month', label: 'This Month'    },
+  { id: 'last-month', label: 'Last Month'    },
+  { id: 'last-30',    label: 'Last 30 Days'  },
+  { id: 'last-90',    label: 'Last 90 Days'  },
+  { id: 'last-3m',    label: 'Last 3 Months' },
 ]
 
 // ─── Date utilities ───────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ function getPresetRange(id) {
     case 'last-month': return { start: new Date(y,mo-1,1),   end: new Date(y,mo,0)     }
     case 'last-30': { const s=new Date(today); s.setDate(s.getDate()-29); return {start:s,end:new Date(today)} }
     case 'last-90': { const s=new Date(today); s.setDate(s.getDate()-89); return {start:s,end:new Date(today)} }
-    case 'ytd':        return { start: new Date(y,0,1),      end: new Date(today)      }
+    case 'last-3m': { const s=new Date(today); s.setMonth(s.getMonth()-3); return {start:s,end:new Date(today)} }
     default:           return { start: new Date(y,mo,1),     end: new Date(y,mo+1,0)   }
   }
 }

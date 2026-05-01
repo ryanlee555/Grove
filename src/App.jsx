@@ -771,15 +771,22 @@ export default function App() {
         return
       }
 
-      const mapped = data.transactions.map(t => ({
-        id:               nextId(),
-        date:             plaidDateToTxDate(t.date),
-        merchant:         t.merchant_name || t.name,
-        category:         categorize(t.merchant_name || t.name),
-        amount:           -Math.abs(t.amount),
-        source:           'Other',
-        institution_name: t.institution_name ?? null,
-      }))
+      const FILTER_CATEGORIES = ['TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS']
+
+      const mapped = data.transactions
+        .filter(t => {
+          const primary = t.personal_finance_category?.primary ?? ''
+          return !FILTER_CATEGORIES.includes(primary)
+        })
+        .map(t => ({
+          id:               nextId(),
+          date:             plaidDateToTxDate(t.date),
+          merchant:         t.merchant_name || t.name,
+          category:         categorize(t.merchant_name || t.name),
+          amount:           -t.amount, // Plaid positive = debit, negative = credit
+          source:           'Other',
+          institution_name: t.institution_name ?? null,
+        }))
 
       setAllTx(mapped)
       setTxLoading(false)

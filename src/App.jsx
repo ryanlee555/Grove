@@ -35,7 +35,6 @@ const PRESETS = [
   { id: 'last-month', label: 'Last Month'    },
   { id: 'last-30',    label: 'Last 30 Days'  },
   { id: 'last-90',    label: 'Last 90 Days'  },
-  { id: 'last-3m',    label: 'Last 3 Months' },
 ]
 
 // ─── Date utilities ───────────────────────────────────────────────────────────

@@ -26,6 +26,11 @@ const COLORS = {
   'Nightlife':         'hsl(270, 20%, 52%)',
   'Miscellaneous':     'hsl(140, 16%, 68%)',
 }
+const CARD_COLORS = {
+  'Chase Flex':      'hsl(140, 16%, 68%)',
+  'Chase Unlimited': 'hsl(145, 38%, 34%)',
+  'Other':           'hsl(25, 55%, 52%)',
+}
 const CATEGORIES   = Object.keys(COLORS)
 const CARD_OPTIONS = ['Chase Unlimited', 'Chase Flex', 'Other']
 
@@ -718,6 +723,175 @@ function CategorySection({ byCategory, totalSpent, transactions }) {
   )
 }
 
+// ─── Spending by Card section (Q2 alternate) ──────────────────────────────────
+function CardSection({ byCard, totalSpent, transactions }) {
+  const [hoveredCard, setHoveredCard] = useState(null)
+  const [lockedCard,  setLockedCard]  = useState(null)
+  const activeCard = lockedCard ?? hoveredCard
+
+  const sectionRef = useRef(null)
+  useEffect(() => {
+    function handler(e) {
+      if (sectionRef.current && !sectionRef.current.contains(e.target)) setLockedCard(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const activeIndex    = activeCard ? byCard.findIndex(e => e.name === activeCard) : -1
+  const activeCardData = activeCard ? byCard.find(e => e.name === activeCard) : null
+
+  const renderActiveShape = useCallback((props) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
+    return <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 10}
+      startAngle={startAngle} endAngle={endAngle} fill={fill} />
+  }, [])
+
+  const handleSliceEnter = useCallback((_, i) => {
+    if (!lockedCard) setHoveredCard(byCard[i]?.name ?? null)
+  }, [lockedCard, byCard])
+
+  const handleSliceLeave = useCallback(() => {
+    if (!lockedCard) setHoveredCard(null)
+  }, [lockedCard])
+
+  const handleSliceClick = useCallback((_, i) => {
+    const name = byCard[i]?.name
+    setLockedCard(l => l === name ? null : name)
+    setHoveredCard(null)
+  }, [byCard])
+
+  return (
+    <div ref={sectionRef} className="flex h-full gap-4 overflow-hidden">
+
+      {/* Chart area */}
+      <div className="flex-1 min-w-0 relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={byCard}
+              cx="50%" cy="50%"
+              innerRadius="50%" outerRadius="74%"
+              paddingAngle={2}
+              dataKey="value"
+              strokeWidth={0}
+              activeIndex={activeIndex >= 0 ? activeIndex : undefined}
+              activeShape={renderActiveShape}
+              onMouseEnter={handleSliceEnter}
+              onMouseLeave={handleSliceLeave}
+              onClick={handleSliceClick}
+            >
+              {byCard.map(e => (
+                <Cell
+                  key={e.name}
+                  fill={CARD_COLORS[e.name] ?? 'hsl(140, 16%, 68%)'}
+                  opacity={activeCard && e.name !== activeCard ? 0.3 : 1}
+                  style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
+                />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+
+        {/* Hover label */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {hoveredCard && !lockedCard && activeCardData && (
+            <div className="text-center px-3 max-w-[120px]">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1 truncate"
+                style={{ color: CARD_COLORS[activeCardData.name] }}>
+                {activeCardData.name}
+              </p>
+              <p className="text-[17px] font-bold tabular-nums leading-none" style={{ color: 'var(--color-fg)' }}>
+                ${activeCardData.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Locked card detail overlay */}
+        {lockedCard && activeCardData && (() => {
+          const cardTx = transactions.filter(t => t.source === lockedCard && t.amount < 0)
+            .sort((a, b) => parseTxDate(b.date) - parseTxDate(a.date))
+          return (
+            <div className="absolute inset-0 rounded-xl flex flex-col p-3 overflow-hidden"
+              style={{ backgroundColor: 'var(--color-bg)' }}>
+              <div className="flex items-start justify-between mb-2 shrink-0">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest truncate"
+                    style={{ color: CARD_COLORS[lockedCard] }}>
+                    {lockedCard}
+                  </p>
+                  <p className="text-[15px] font-bold tabular-nums leading-tight" style={{ color: 'var(--color-fg)' }}>
+                    ${activeCardData.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setLockedCard(null); setHoveredCard(null) }}
+                  className="ml-2 shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs leading-none transition-colors"
+                  style={{ color: 'var(--color-muted-text)' }}>
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1">
+                {cardTx.length === 0 ? (
+                  <p className="text-[11px] text-center mt-4" style={{ color: 'var(--color-muted-text)' }}>No transactions</p>
+                ) : cardTx.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium truncate" style={{ color: 'var(--color-fg)' }}>{t.merchant}</p>
+                      <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</p>
+                    </div>
+                    <p className="text-[11px] font-semibold tabular-nums text-red-600 shrink-0">
+                      -${Math.abs(t.amount).toFixed(2)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] text-center mt-1.5 shrink-0" style={{ color: 'var(--color-muted-text)' }}>
+                {cardTx.length} transaction{cardTx.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* Legend list */}
+      <div className="w-44 shrink-0 overflow-y-auto flex flex-col gap-0.5 py-1 pr-1">
+        {byCard.map(({ name, value }) => {
+          const isActive = activeCard === name
+          const isDimmed = activeCard && !isActive
+          return (
+            <div
+              key={name}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none transition-all duration-150"
+              style={{
+                backgroundColor: isActive ? 'var(--color-muted-bg)' : 'transparent',
+                opacity: isDimmed ? 0.35 : 1,
+              }}
+              onMouseEnter={() => { if (!lockedCard) setHoveredCard(name) }}
+              onMouseLeave={() => { if (!lockedCard) setHoveredCard(null) }}
+              onClick={() => { setLockedCard(l => l === name ? null : name); setHoveredCard(null) }}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0 transition-transform duration-150"
+                style={{ backgroundColor: CARD_COLORS[name] ?? 'hsl(140, 16%, 68%)',
+                         transform: isActive ? 'scale(1.4)' : 'scale(1)' }} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] truncate transition-all duration-150"
+                  style={{ fontWeight: isActive ? 700 : 500, color: 'var(--color-fg)' }}>
+                  {name}
+                </p>
+                <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>
+                  ${value.toFixed(2)} · {((value / totalSpent) * 100).toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const navigate = useNavigate()
@@ -811,6 +985,9 @@ export default function App() {
     loadTransactions()
   }, [])
 
+  // Q2 Category / Card toggle
+  const [catCardView, setCatCardView] = useState('category')
+
   // Inline row editing
   const [expandedRow, setExpandedRow] = useState(null)
 
@@ -888,6 +1065,15 @@ export default function App() {
     const map = {}
     transactions.filter(t => t.amount < 0)
       .forEach(t => { map[t.category] = (map[t.category] || 0) + Math.abs(t.amount) })
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
+      .sort((a, b) => b.value - a.value)
+  }, [transactions])
+
+  const byCard = useMemo(() => {
+    const map = {}
+    transactions.filter(t => t.amount < 0)
+      .forEach(t => { map[t.source] = (map[t.source] || 0) + Math.abs(t.amount) })
     return Object.entries(map)
       .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
       .sort((a, b) => b.value - a.value)
@@ -1016,7 +1202,7 @@ export default function App() {
                       Credit / Debit Cards:
                     </p>
                     {[
-                      { label: 'Chase Freedom Flex',      color: 'hsl(25, 55%, 52%)',  source: 'Chase Flex'      },
+                      { label: 'Chase Freedom Flex',      color: 'hsl(140, 16%, 68%)', source: 'Chase Flex'      },
                       { label: 'Chase Freedom Unlimited', color: 'hsl(145, 38%, 34%)', source: 'Chase Unlimited' },
                     ].map(({ label, color, source }) => {
                       const amt = transactions.filter(t => t.source === source && t.amount < 0)
@@ -1054,13 +1240,36 @@ export default function App() {
               </div>
             </Card>
 
-            {/* Q2 — Spending by Category */}
-            <Card title="Spending by Category" colDivider>
-              <CategorySection
-                byCategory={byCategory}
-                totalSpent={totalSpent}
-                transactions={transactions}
-              />
+            {/* Q2 — Spending by Category / Card */}
+            <Card title="Spending by Category" colDivider
+              action={
+                <div className="flex items-center gap-0.5 rounded-lg p-0.5"
+                  style={{ backgroundColor: 'var(--color-muted-bg)' }}>
+                  {['category', 'card'].map(v => (
+                    <button key={v} onClick={() => setCatCardView(v)}
+                      className="px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-colors"
+                      style={catCardView === v
+                        ? { backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
+                        : { color: 'var(--color-muted-text)' }}>
+                      {v === 'category' ? 'Category' : 'Card'}
+                    </button>
+                  ))}
+                </div>
+              }
+            >
+              {catCardView === 'category' ? (
+                <CategorySection
+                  byCategory={byCategory}
+                  totalSpent={totalSpent}
+                  transactions={transactions}
+                />
+              ) : (
+                <CardSection
+                  byCard={byCard}
+                  totalSpent={totalSpent}
+                  transactions={transactions}
+                />
+              )}
             </Card>
 
             {/* Q3 — Transactions */}
@@ -1128,7 +1337,7 @@ export default function App() {
                                 style={isUnlimited
                                   ? { backgroundColor: 'hsl(145, 38%, 90%)', color: 'hsl(145, 38%, 28%)' }
                                   : isFlex
-                                  ? { backgroundColor: 'hsl(25, 55%, 90%)',  color: 'hsl(25, 55%, 32%)' }
+                                  ? { backgroundColor: 'hsl(140, 16%, 88%)', color: 'hsl(140, 16%, 38%)' }
                                   : { backgroundColor: 'var(--color-muted-bg)', color: 'var(--color-muted-text)' }}>
                                 {isUnlimited ? 'Unlimited' : isFlex ? 'Flex' : t.source}
                               </span>

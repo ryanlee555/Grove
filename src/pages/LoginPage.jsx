@@ -24,13 +24,12 @@ export default function LoginPage() {
     }
 
     // Check plaid_tokens table for this user
-    const { data: tokenRow } = await supabase
+    const { data: tokenRows } = await supabase
       .from('plaid_tokens')
       .select('id')
       .eq('user_id', data.user.id)
-      .maybeSingle()
 
-    navigate(tokenRow ? '/dashboard' : '/onboarding', { replace: true })
+    navigate(tokenRows?.length > 0 ? '/dashboard' : '/onboarding', { replace: true })
   }
 
   return (

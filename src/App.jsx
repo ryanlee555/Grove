@@ -752,7 +752,8 @@ export default function App() {
   const [formAmount,   setFormAmount]   = useState('')
 
   // Unified transaction store (Plaid + manual), each tx has a stable id
-  const [allTx,    setAllTx]    = useState([])
+  const [allTx,     setAllTx]     = useState([])
+  const [accounts,  setAccounts]  = useState([])
   const [txLoading, setTxLoading] = useState(true)
   const [txError,   setTxError]   = useState('')
 
@@ -795,12 +796,16 @@ export default function App() {
           })(),
           category:         plaidCategoryToGrove(t.personal_finance_category?.detailed ?? '', t.merchant_name || t.name),
           amount:           -t.amount, // Plaid positive = debit, negative = credit
-          source:           'Other',
+          source: t.account_id === 'xMZQeOL4EVH1ZERR5AOJcPZr4DdVxKcJnXOBR' ? 'Chase Flex'
+                  : t.account_id === 'aEQgpwa9oyCMRj88vNx7SQLjOpyZ39I9EB7rP' ? 'Chase Unlimited'
+                  : 'Other',
           institution_name: t.institution_name ?? null,
         }))
 
-      setAllTx(mapped)
-      setTxLoading(false)
+        setAllTx(mapped)
+        setAccounts(data.accounts ?? [])
+        console.log('ACCOUNTS:', data.accounts)
+        setTxLoading(false)
     }
 
     loadTransactions()

@@ -13,6 +13,8 @@ const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS = {
+  'Zelle':             'hsl(214, 70%, 50%)',
+  'Venmo':             'hsl(217, 89%, 40%)',
   'Food & Dining':     'hsl(145, 38%, 34%)',
   'Groceries':         'hsl(140, 22%, 52%)',
   'Events':            'hsl(42, 68%, 58%)',
@@ -118,6 +120,8 @@ function plaidCategoryToGrove(detailed = '', name = '') {
   const d = detailed.toUpperCase()
   const n = name.toUpperCase()
 
+  if (/ZELLE/.test(n)) return 'Zelle'
+  if (/VENMO/.test(n)) return 'Venmo'
   if (/RESTAURANT|FAST_FOOD|COFFEE|FOOD_AND_DRINK|DINING|BAKERY|BAR|JUICE|FOOD_DELIVERY/.test(d)) return 'Food & Dining'
   if (/GROCERIES|SUPERMARKET|FARMERS_MARKET/.test(d)) return 'Groceries'
   if (/TAXI|RIDE|TRANSIT|GAS|PARKING|AUTO|AIRLINE|FERRY|SUBWAY|TRAIN|TOLL|FUEL|TRANSPORT/.test(d)) return 'Transport'
@@ -773,17 +777,22 @@ export default function App() {
         return
       }
 
-      const FILTER_CATEGORIES = ['TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS']
-
       const mapped = data.transactions
         .filter(t => {
           const primary = t.personal_finance_category?.primary ?? ''
-          return !FILTER_CATEGORIES.includes(primary)
+          const name = (t.merchant_name || t.name || '').toUpperCase()
+          if (primary === 'LOAN_PAYMENTS') return false
+          if (primary === 'TRANSFER_OUT' && !name.includes('ZELLE')) return false
+          if (primary === 'TRANSFER_IN'  && !name.includes('ZELLE')) return false
+          return true
         })
         .map(t => ({
           id:               nextId(),
           date:             plaidDateToTxDate(t.date),
-          merchant:         t.merchant_name || t.name,
+          merchant: (() => {
+            const raw = t.merchant_name || t.name || ''
+            return raw.replace(/\s+[A-Z0-9]{8,}\s*$/i, '').trim()
+          })(),
           category:         plaidCategoryToGrove(t.personal_finance_category?.detailed ?? '', t.merchant_name || t.name),
           amount:           -t.amount, // Plaid positive = debit, negative = credit
           source:           'Other',

@@ -976,7 +976,25 @@ export default function App() {
           institution_name: t.institution_name ?? null,
         }))
 
-        setAllTx(mapped)
+        // Load overrides from Supabase and merge
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: overrides } = await supabase
+          .from('transaction_overrides')
+          .select('*')
+          .eq('user_id', user.id)
+
+        const overrideMap = {}
+        ;(overrides || []).forEach(o => { overrideMap[o.transaction_id] = o })
+
+        const withOverrides = mapped.map(t => ({
+          ...t,
+          ...(overrideMap[t.id] ? {
+            category: overrideMap[t.id].category ?? t.category,
+            merchant: overrideMap[t.id].name ?? t.merchant,
+          } : {})
+        }))
+
+        setAllTx(withOverrides)
         setAccounts(data.accounts ?? [])
         console.log('ACCOUNTS:', data.accounts)
         setTxLoading(false)
@@ -1034,7 +1052,7 @@ export default function App() {
   const handleAddExpense = (e) => {
     e.preventDefault()
     setAllTx(prev => [...prev, {
-      id:       nextId(),
+      id:       t.transaction_id,
       date:     toTxDateStr(fromInputDate(formDate)),
       merchant: formMerchant.trim(),
       category: formCategory,
@@ -1047,8 +1065,19 @@ export default function App() {
     setFormCategory('Food & Dining'); setFormPayment('Chase Unlimited')
   }
 
-  const handleEditTx = (id, updated) =>
+  const handleEditTx = async (id, updated) => {
     setAllTx(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t))
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    console.log('user:', user, 'userError:', userError)
+    const { data, error } = await supabase.from('transaction_overrides').upsert({
+      user_id: user.id,
+      transaction_id: id,
+      category: updated.category,
+      name: updated.merchant,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id, transaction_id' })
+    console.log('upsert data:', data, 'upsert error:', error)
+  }
 
   const handleDeleteTx = (id) =>
     setAllTx(prev => prev.filter(t => t.id !== id))

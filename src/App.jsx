@@ -962,7 +962,7 @@ export default function App() {
           return true
         })
         .map(t => ({
-          id:               nextId(),
+          id:               t.transaction_id,
           date:             plaidDateToTxDate(t.date),
           merchant: (() => {
             const raw = t.merchant_name || t.name || ''
@@ -994,7 +994,16 @@ export default function App() {
           } : {})
         }))
 
-        setAllTx(withOverrides)
+        const { data: deletedRows } = await supabase
+          .from('deleted_transactions')
+          .select('transaction_id')
+          .eq('user_id', user.id)
+
+        const deletedIds = new Set((deletedRows || []).map(r => r.transaction_id))
+        console.log('deletedRows:', deletedRows)
+        console.log('deletedIds:', [...deletedIds])
+        console.log('sample tx ids:', withOverrides.slice(0, 3).map(t => t.id))
+        setAllTx(withOverrides.filter(t => !deletedIds.has(t.id)))
         setAccounts(data.accounts ?? [])
         console.log('ACCOUNTS:', data.accounts)
         setTxLoading(false)
@@ -1079,8 +1088,14 @@ export default function App() {
     console.log('upsert data:', data, 'upsert error:', error)
   }
 
-  const handleDeleteTx = (id) =>
-    setAllTx(prev => prev.filter(t => t.id !== id))
+  const handleDeleteTx = async (id) => {
+    setAllTx(prev => prev.filter(t => t.id !== id));
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('deleted_transactions').upsert({
+      user_id: user.id,
+      transaction_id: id,
+    }, { onConflict: 'user_id,transaction_id' });
+  };
 
   // ── Data ─────────────────────────────────────────────────────────────────────
   const transactions = useMemo(() => {

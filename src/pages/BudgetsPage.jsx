@@ -559,7 +559,7 @@ export default function BudgetsPage() {
 
           {/* Budget cards grid */}
           <div ref={cardsGridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-            {CATEGORIES.map(category => (
+            {[...CATEGORIES].sort((a, b) => (spending[b] ?? 0) - (spending[a] ?? 0)).map(category => (
               <BudgetCard
                 key={category}
                 category={category}

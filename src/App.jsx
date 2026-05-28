@@ -539,13 +539,16 @@ function TrendsSection({ allTx, dateRange, rangeDays }) {
 }
 
 // ─── Spending by Category section (Q2) ───────────────────────────────────────
-function CategorySection({ byCategory, totalSpent, transactions }) {
-  const [hoveredCat, setHoveredCat] = useState(null)
-  const [lockedCat,  setLockedCat]  = useState(null)
+function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = {} }) {
+  const navigate = useNavigate()
+  const [hoveredCat,   setHoveredCat]   = useState(null)
+  const [lockedCat,    setLockedCat]    = useState(null)
+  const [openPopover,  setOpenPopover]  = useState(null) // { name, x, y }
   const activeCat = lockedCat ?? hoveredCat
 
   // Click outside the section → deselect locked
   const sectionRef = useRef(null)
+  const popoverRef = useRef(null)
   useEffect(() => {
     function handler(e) {
       if (sectionRef.current && !sectionRef.current.contains(e.target)) {
@@ -555,6 +558,18 @@ function CategorySection({ byCategory, totalSpent, transactions }) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Click outside popover → close it
+  useEffect(() => {
+    if (!openPopover) return
+    function handler(e) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setOpenPopover(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openPopover])
 
   // ── Pie interactions ─────────────────────────────────────────────────────────
   const activeIndex = activeCat ? byCategory.findIndex(e => e.name === activeCat) : -1
@@ -691,6 +706,9 @@ function CategorySection({ byCategory, totalSpent, transactions }) {
         {byCategory.map(({ name, value }) => {
           const isActive = activeCat === name
           const isDimmed = activeCat && !isActive
+          const limit  = budgetLimits[name]
+          const isOver = limit != null && value > limit
+          const overBy = isOver ? value - limit : 0
           return (
             <div
               key={name}
@@ -707,10 +725,32 @@ function CategorySection({ byCategory, totalSpent, transactions }) {
                 style={{ backgroundColor: COLORS[name] ?? 'hsl(140, 16%, 68%)',
                          transform: isActive ? 'scale(1.4)' : 'scale(1)' }} />
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] truncate transition-all duration-150"
-                  style={{ fontWeight: isActive ? 700 : 500, color: 'var(--color-fg)' }}>
-                  {name}
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <p className="text-[11px] truncate transition-all duration-150"
+                    style={{ fontWeight: isActive ? 700 : 500, color: 'var(--color-fg)', margin: 0 }}>
+                    {name}
+                  </p>
+                  {isOver && (
+                    <div style={{ position: 'relative', flexShrink: 0, marginLeft: 5 }}>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setOpenPopover(p => p?.name === name ? null : { name, x: rect.left, y: rect.top + rect.height / 2 })
+                        }}
+                        style={{
+                          width: 16, height: 16, borderRadius: '50%',
+                          backgroundColor: 'hsl(0, 65%, 50%)', color: '#fff',
+                          fontSize: 10, fontWeight: 700, lineHeight: 1,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          border: 'none', cursor: 'pointer', padding: 0,
+                        }}
+                      >
+                        !
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>
                   ${value.toFixed(2)} · {((value / totalSpent) * 100).toFixed(1)}%
                 </p>
@@ -718,6 +758,50 @@ function CategorySection({ byCategory, totalSpent, transactions }) {
             </div>
           )
         })}
+
+        {/* Over-budget popover — fixed to viewport so it escapes overflow */}
+        {openPopover && (
+          <div
+            ref={popoverRef}
+            style={{
+              position: 'fixed',
+              right: window.innerWidth - openPopover.x + 8,
+              top: openPopover.y,
+              transform: 'translateY(-50%)',
+              zIndex: 100,
+              minWidth: 180,
+              backgroundColor: 'var(--color-bg-card)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 12,
+              padding: 14,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 13, color: 'var(--color-fg)', margin: '0 0 8px' }}>
+              {openPopover.name}
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--color-muted-text)', margin: '0 0 4px' }}>
+              Spent: <span style={{ color: 'var(--color-fg)', fontWeight: 600 }}>${byCategory.find(e => e.name === openPopover.name)?.value.toFixed(2)}</span>
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--color-muted-text)', margin: '0 0 4px' }}>
+              Limit: <span style={{ color: 'var(--color-fg)', fontWeight: 600 }}>${(budgetLimits[openPopover.name] ?? 0).toFixed(2)}</span>
+            </p>
+            <p style={{ fontSize: 12, fontWeight: 600, color: 'hsl(0, 60%, 48%)', margin: '0 0 12px' }}>
+              Over by: ${(byCategory.find(e => e.name === openPopover.name)?.value - budgetLimits[openPopover.name]).toFixed(2)}
+            </p>
+            <button
+              onClick={() => { setOpenPopover(null); navigate('/budgets') }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                fontSize: 12, fontWeight: 600, color: 'hsl(145, 38%, 34%)',
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              View Budgets →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -926,10 +1010,11 @@ export default function App() {
   const [formAmount,   setFormAmount]   = useState('')
 
   // Unified transaction store (Plaid + manual), each tx has a stable id
-  const [allTx,     setAllTx]     = useState([])
-  const [accounts,  setAccounts]  = useState([])
-  const [txLoading, setTxLoading] = useState(true)
-  const [txError,   setTxError]   = useState('')
+  const [allTx,       setAllTx]       = useState([])
+  const [accounts,    setAccounts]    = useState([])
+  const [txLoading,   setTxLoading]   = useState(true)
+  const [txError,     setTxError]     = useState('')
+  const [dashBudgets, setDashBudgets] = useState({})
 
   useEffect(() => {
     async function loadTransactions() {
@@ -1011,6 +1096,19 @@ export default function App() {
 
     loadTransactions()
   }, [])
+
+  useEffect(() => {
+    if (txLoading) return
+    async function fetchBudgets() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('budgets').select('*').eq('user_id', user.id)
+      const map = {}
+      ;(data || []).forEach(b => { map[b.category] = b.monthly_limit })
+      setDashBudgets(map)
+    }
+    fetchBudgets()
+  }, [txLoading])
 
   // Q2 Category / Card toggle
   const [catCardView, setCatCardView] = useState('category')
@@ -1141,6 +1239,14 @@ export default function App() {
   const purchaseCount = transactions.filter(t => t.amount < 0).length
   const topCategory   = byCategory[0]?.name  ?? '—'
   const topCatAmt     = byCategory[0]?.value ?? 0
+
+  const overBudgetCats = useMemo(() => {
+    const set = new Set()
+    byCategory.forEach(({ name, value }) => {
+      if (dashBudgets[name] != null && value > dashBudgets[name]) set.add(name)
+    })
+    return set
+  }, [byCategory, dashBudgets])
   const rangeDays     = Math.max(1, Math.ceil((dateRange.end - dateRange.start) / (1000*60*60*24)) + 1)
   const dailyAvg      = totalSpent / rangeDays
 
@@ -1162,6 +1268,21 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate('/budgets')}
+              style={{
+                backgroundColor: overBudgetCats.size === 0
+                  ? 'hsl(145, 38%, 34%)'
+                  : overBudgetCats.size <= 2
+                  ? 'hsl(42, 68%, 58%)'
+                  : 'hsl(0, 65%, 50%)',
+                color: '#fff',
+                border: 'none', borderRadius: 999, padding: '6px 14px',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                fontFamily: "'DM Sans', sans-serif",
+              }}>
+              {overBudgetCats.size === 0 ? `✓ 0 over budget` : `⚠ ${overBudgetCats.size} over budget`}
+            </button>
             <button
               onClick={() => navigate('/onboarding')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-colors"
@@ -1306,6 +1427,7 @@ export default function App() {
                   byCategory={byCategory}
                   totalSpent={totalSpent}
                   transactions={transactions}
+                  budgetLimits={dashBudgets}
                 />
               ) : (
                 <CardSection

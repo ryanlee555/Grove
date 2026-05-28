@@ -8,6 +8,8 @@ import LoginPage from './pages/LoginPage.jsx'
 import SignupPage from './pages/SignupPage.jsx'
 import OnboardingPage from './pages/OnboardingPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
+import BudgetsPage from './pages/BudgetsPage.jsx'
+
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -21,6 +23,9 @@ createRoot(document.getElementById('root')).render(
         } />
         <Route path="/dashboard" element={
           <ProtectedRoute><Dashboard /></ProtectedRoute>
+        } />
+        <Route path="/budgets" element={
+          <ProtectedRoute><BudgetsPage /></ProtectedRoute>
         } />
       </Routes>
     </BrowserRouter>

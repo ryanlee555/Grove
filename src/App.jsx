@@ -228,7 +228,7 @@ function StackedBarTip({ active, payload, label, isWeekly }) {
 }
 
 // Line chart tooltip — period + $ per series
-function LineTip({ active, payload, label, compareRanges, dateRange, lineColors, hasComparisons }) {
+function LineTip({ active, payload, label, compareRanges, selectedPeriod, lineColors, hasComparisons }) {
   if (!active || !payload?.length) return null
   const visible = payload.filter(p => p.value != null)
   return (
@@ -240,7 +240,7 @@ function LineTip({ active, payload, label, compareRanges, dateRange, lineColors,
       {visible.map(p => {
         const idx = p.dataKey === 'primary' ? 0 : parseInt(p.dataKey.replace('comp', '')) + 1
         const periodName = p.dataKey === 'primary'
-          ? formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)
+          ? formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)
           : compareRanges[parseInt(p.dataKey.replace('comp', ''))]?.label ?? p.dataKey
         return (
           <div key={p.dataKey} className="flex items-center justify-between gap-3 py-0.5">
@@ -329,7 +329,7 @@ const LINE_COLORS = [
   'hsl(270, 20%, 52%)',
 ]
 
-function TrendsSection({ allTx, dateRange, rangeDays }) {
+function TrendsSection({ allTx, selectedPeriod, rangeDays }) {
   const [view,          setView]          = useState('bar')
   const [compareRanges, setCompareRanges] = useState([])
   const [compMonthId,   setCompMonthId]   = useState('')
@@ -341,23 +341,23 @@ function TrendsSection({ allTx, dateRange, rangeDays }) {
 
   // Check whether the current date range is exactly a full calendar month
   const isFullMonth = useMemo(() => {
-    const { start, end } = dateRange
+    const { start, end } = selectedPeriod
     if (start.getDate() !== 1) return false
     const lastDay = new Date(start.getFullYear(), start.getMonth() + 1, 0)
     return end.getFullYear() === lastDay.getFullYear() &&
       end.getMonth() === lastDay.getMonth() &&
       end.getDate() === lastDay.getDate()
-  }, [dateRange])
+  }, [selectedPeriod])
 
   // ID of current month (to exclude from dropdown)
   const currentMonthId = isFullMonth
-    ? `${dateRange.start.getFullYear()}-${String(dateRange.start.getMonth()+1).padStart(2,'0')}`
+    ? `${selectedPeriod.start.getFullYear()}-${String(selectedPeriod.start.getMonth()+1).padStart(2,'0')}`
     : null
 
   // Primary buckets (stacked bar + line primary)
   const primaryData = useMemo(() =>
-    computeWeeklyBuckets(allTx, dateRange.start, dateRange.end),
-    [allTx, dateRange]
+    computeWeeklyBuckets(allTx, selectedPeriod.start, selectedPeriod.end),
+    [allTx, selectedPeriod]
   )
 
   const hasComparisons = compareRanges.length > 0
@@ -416,7 +416,7 @@ function TrendsSection({ allTx, dateRange, rangeDays }) {
       {/* Row 1 — subtitle + Bar/Line toggle */}
       <div className="flex items-center justify-between shrink-0 gap-2">
         <p className="text-[11px] truncate" style={{ color: 'var(--color-muted-text)' }}>
-          {isWeekly ? 'Weekly' : 'Monthly'} spending — {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
+          {isWeekly ? 'Weekly' : 'Monthly'} spending — {formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)}
         </p>
         <div className="flex items-center gap-0.5 rounded-lg p-0.5 shrink-0"
           style={{ backgroundColor: 'var(--color-muted-bg)' }}>
@@ -463,7 +463,7 @@ function TrendsSection({ allTx, dateRange, rangeDays }) {
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
                 style={{ backgroundColor: LINE_COLORS[0] + '28', color: LINE_COLORS[0] }}>
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: LINE_COLORS[0] }} />
-                {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
+                {formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)}
               </span>
               {compareRanges.map((cr, i) => (
                 <span key={cr.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
@@ -505,7 +505,7 @@ function TrendsSection({ allTx, dateRange, rangeDays }) {
               <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill:ca, fontSize:10 }} />
               <YAxis tick={{ fill:ca, fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`} />
               <Tooltip
-                content={(props) => <LineTip {...props} compareRanges={compareRanges} dateRange={dateRange} lineColors={LINE_COLORS} hasComparisons={hasComparisons} />}
+                content={(props) => <LineTip {...props} compareRanges={compareRanges} selectedPeriod={selectedPeriod} lineColors={LINE_COLORS} hasComparisons={hasComparisons} />}
                 cursor={{ stroke: 'rgba(58, 125, 84, 0.2)', strokeWidth:1 }}
               />
               <Line dataKey="primary" stroke={LINE_COLORS[0]} strokeWidth={2.5} dot={false} connectNulls activeDot={{ r:4, strokeWidth:0 }} />
@@ -521,7 +521,7 @@ function TrendsSection({ allTx, dateRange, rangeDays }) {
       {view === 'line' && hasComparisons && (
         <div className="shrink-0 flex items-center gap-3 flex-wrap pt-0.5">
           {[
-            { key:'primary', label: formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end), color: LINE_COLORS[0], dashed: false },
+            { key:'primary', label: formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end), color: LINE_COLORS[0], dashed: false },
             ...compareRanges.map((cr, i) => ({ key: cr.id, label: cr.label, color: LINE_COLORS[i+1], dashed: true })),
           ].map(({ key, label, color, dashed }) => (
             <div key={key} className="flex items-center gap-1.5 min-w-0">
@@ -977,7 +977,7 @@ function CardSection({ byCard, totalSpent, transactions }) {
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ selectedPeriod, setSelectedPeriod }) {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef(null)
@@ -992,11 +992,9 @@ export default function App() {
   const [sortDir, setSortDir] = useState('desc')
 
   // Date range
-  const initRange = getPresetRange('this-month')
-  const [dateRange,      setDateRange]      = useState({ preset: 'this-month', ...initRange })
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const [customStart,    setCustomStart]    = useState(toInputDate(initRange.start))
-  const [customEnd,      setCustomEnd]      = useState(toInputDate(initRange.end))
+  const [customStart,    setCustomStart]    = useState(toInputDate(selectedPeriod.start))
+  const [customEnd,      setCustomEnd]      = useState(toInputDate(selectedPeriod.end))
   const [datePickerPos,  setDatePickerPos]  = useState({ top: 0, left: 0 })
   const dateBtnRef    = useRef(null)
   const datePickerRef = useRef(null)
@@ -1140,7 +1138,7 @@ export default function App() {
 
   const applyPreset = (id) => {
     const range = getPresetRange(id)
-    setDateRange({ preset: id, ...range })
+    setSelectedPeriod({ preset: id, ...range })
     setCustomStart(toInputDate(range.start))
     setCustomEnd(toInputDate(range.end))
     setSortCol('date'); setSortDir('desc')
@@ -1151,7 +1149,7 @@ export default function App() {
     if (!customStart || !customEnd) return
     const start = fromInputDate(customStart), end = fromInputDate(customEnd)
     if (start > end) return
-    setDateRange({ preset: 'custom', start, end })
+    setSelectedPeriod({ preset: 'custom', start, end })
     setSortCol('date'); setSortDir('desc')
     setShowDatePicker(false)
   }
@@ -1199,9 +1197,9 @@ export default function App() {
   const transactions = useMemo(() => {
     return allTx.filter(t => {
       const d = parseTxDate(t.date)
-      return d >= dateRange.start && d <= dateRange.end
+      return d >= selectedPeriod.start && d <= selectedPeriod.end
     })
-  }, [allTx, dateRange])
+  }, [allTx, selectedPeriod])
 
   const byCategory = useMemo(() => {
     const map = {}
@@ -1247,7 +1245,7 @@ export default function App() {
     })
     return set
   }, [byCategory, dashBudgets])
-  const rangeDays     = Math.max(1, Math.ceil((dateRange.end - dateRange.start) / (1000*60*60*24)) + 1)
+  const rangeDays     = Math.max(1, Math.ceil((selectedPeriod.end - selectedPeriod.start) / (1000*60*60*24)) + 1)
   const dailyAvg      = totalSpent / rangeDays
 
   return (
@@ -1355,7 +1353,7 @@ export default function App() {
                   <button ref={dateBtnRef} onClick={openDatePicker}
                     className="flex items-center gap-1 mb-2 text-[11px] font-medium transition-colors"
                     style={{ color: 'var(--color-muted-text)' }}>
-                    {formatRangeLabel(dateRange.preset, dateRange.start, dateRange.end)}
+                    {formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)}
                     <ChevronDown size={11} className={`transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
                   </button>
                   <p className="text-5xl font-bold tracking-tight tabular-nums leading-none" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
@@ -1537,7 +1535,7 @@ export default function App() {
             <Card title="Trends" divider colDivider>
               <TrendsSection
                 allTx={allTx}
-                dateRange={dateRange}
+                selectedPeriod={selectedPeriod}
                 rangeDays={rangeDays}
               />
             </Card>
@@ -1555,11 +1553,11 @@ export default function App() {
               {PRESETS.map(p => (
                 <button key={p.id} onClick={() => applyPreset(p.id)}
                   className="px-3 py-2 rounded-lg text-[11px] font-semibold text-left transition-colors"
-                  style={dateRange.preset === p.id
+                  style={selectedPeriod.preset === p.id
                     ? { backgroundColor: 'var(--color-primary)', color: 'white' }
                     : { color: 'var(--color-fg)' }}
-                  onMouseEnter={e => { if (dateRange.preset !== p.id) e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)' }}
-                  onMouseLeave={e => { if (dateRange.preset !== p.id) e.currentTarget.style.backgroundColor = 'transparent' }}>
+                  onMouseEnter={e => { if (selectedPeriod.preset !== p.id) e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)' }}
+                  onMouseLeave={e => { if (selectedPeriod.preset !== p.id) e.currentTarget.style.backgroundColor = 'transparent' }}>
                   {p.label}
                 </button>
               ))}

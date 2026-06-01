@@ -113,7 +113,7 @@ function getPeriodLabel(id, customFrom = '', customTo = '') {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function BudgetsPage() {
+export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
   const navigate = useNavigate()
 
   const [loading, setLoading]       = useState(true)
@@ -123,8 +123,8 @@ export default function BudgetsPage() {
   const [userId, setUserId]         = useState(null)
   const [userEmail, setUserEmail]   = useState('')
 
-  const [period, setPeriod]         = useState('this-month')
-  const [prevPeriod, setPrevPeriod] = useState('this-month')
+  const period = selectedPeriod.preset
+  const [prevPeriod, setPrevPeriod] = useState(selectedPeriod.preset)
   const [pendingPeriod, setPending] = useState(null)
   const [pendingMult, setPendingMult] = useState(1)
   const [useMultiplier, setUseMultiplier] = useState(true)
@@ -223,6 +223,7 @@ export default function BudgetsPage() {
     const from = new Date(customFrom + 'T00:00:00')
     const to   = new Date(customTo   + 'T00:00:00')
     if (to < from) return
+    setSelectedPeriod(prev => ({ ...prev, preset: 'custom', start: from, end: to }))
     const days = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1
     if (days > 35) {
       const mult = Math.round(days / 30)
@@ -254,9 +255,10 @@ export default function BudgetsPage() {
 
   // ── Derived: spending aggregated by period ────────────────────────────────
   const spending = useMemo(() => {
-    const { start, end } = getPeriodRange(period, customFrom, customTo)
+    const { start, end } = selectedPeriod
     const spendMap = {}
     CATEGORIES.forEach(c => { spendMap[c] = 0 })
+    if (!start || !end) return spendMap
     allTx.forEach(t => {
       if (t.amount >= 0) return
       const d = parseTxDate(t.date)
@@ -266,20 +268,18 @@ export default function BudgetsPage() {
       }
     })
     return spendMap
-  }, [allTx, period, customFrom, customTo])
+  }, [allTx, selectedPeriod])
 
   // ── Derived: effective multiplier ─────────────────────────────────────────
   const effectiveMultiplier = useMemo(() => {
     if (!useMultiplier) return 1
     if (period === 'last-3') return 3
-    if (period === 'custom' && customFrom && customTo) {
-      const from = new Date(customFrom + 'T00:00:00')
-      const to   = new Date(customTo   + 'T00:00:00')
-      const days = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1
+    if (period === 'custom' && selectedPeriod.start && selectedPeriod.end) {
+      const days = Math.ceil((selectedPeriod.end - selectedPeriod.start) / (1000 * 60 * 60 * 24)) + 1
       return days > 35 ? Math.round(days / 30) : 1
     }
     return 1
-  }, [period, useMultiplier, customFrom, customTo])
+  }, [period, useMultiplier, selectedPeriod])
 
   // ── Derived: limits scaled for the display period ─────────────────────────
   const effectiveLimits = useMemo(() => {
@@ -313,29 +313,37 @@ export default function BudgetsPage() {
       setPending('last-3')
     } else if (id === 'custom') {
       setPrevPeriod(period)
-      setPeriod('custom')
+      setSelectedPeriod(prev => ({ ...prev, preset: 'custom' }))
       setUseMultiplier(false)
     } else {
-      setPeriod(id)
+      const range = getPeriodRange(id, '', '')
+      setSelectedPeriod({ preset: id, start: range.start, end: range.end })
       setUseMultiplier(true)
     }
   }
 
   function handleModalMultiply() {
     setUseMultiplier(true)
-    if (pendingPeriod !== 'custom') setPeriod(pendingPeriod)
+    if (pendingPeriod !== 'custom') {
+      const range = getPeriodRange(pendingPeriod, '', '')
+      setSelectedPeriod({ preset: pendingPeriod, start: range.start, end: range.end })
+    }
     setPending(null)
   }
 
   function handleModalKeep() {
     setUseMultiplier(false)
-    if (pendingPeriod !== 'custom') setPeriod(pendingPeriod)
+    if (pendingPeriod !== 'custom') {
+      const range = getPeriodRange(pendingPeriod, '', '')
+      setSelectedPeriod({ preset: pendingPeriod, start: range.start, end: range.end })
+    }
     setPending(null)
   }
 
   function handleModalCancel() {
     if (pendingPeriod === 'custom') {
-      setPeriod(prevPeriod)
+      const range = getPeriodRange(prevPeriod, '', '')
+      setSelectedPeriod({ preset: prevPeriod, start: range.start, end: range.end })
       setCustomFrom('')
       setCustomTo('')
     }

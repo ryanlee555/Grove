@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import LeafIcon from '../components/LeafIcon'
+import ArcSlider from '../components/ArcSlider'
 
 const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
@@ -136,6 +137,9 @@ export default function BudgetsPage() {
   const [showHamilton, setShowHamilton] = useState(false)
   const [highlightOver, setHighlightOver] = useState(false)
   const cardsGridRef = useRef(null)
+
+  const [editingCategory, setEditingCategory] = useState(null)
+  const [draftLimit, setDraftLimit] = useState(0)
 
   // ── Data fetching (unchanged Supabase logic) ──────────────────────────────
   const loadData = useCallback(async () => {
@@ -569,10 +573,20 @@ export default function BudgetsPage() {
                 editValue={editing[category] ?? null}
                 isSaving={saving[category] ?? false}
                 highlight={highlightOver && effectiveLimits[category] != null && (spending[category] ?? 0) > effectiveLimits[category]}
-                onEditStart={() => setEditing(e => ({ ...e, [category]: String(budgets[category] ?? '') }))}
+                onEditStart={() => { setEditingCategory(category); setDraftLimit(budgets[category] ?? 0) }}
                 onEditChange={v => setEditing(e => ({ ...e, [category]: v }))}
                 onSave={() => saveLimit(category)}
                 onClear={() => clearLimit(category)}
+                isEditing={editingCategory === category}
+                draftLimit={draftLimit}
+                maxArcValue={Math.max(3000, Math.ceil((spending[category] ?? 0) / 500) * 500)}
+                onArcConfirm={async (val) => {
+                  await supabase.from('budgets').upsert({ user_id: userId, category, monthly_limit: val }, { onConflict: 'user_id,category' })
+                  setBudgets(b => ({ ...b, [category]: val }))
+                  setEditingCategory(null)
+                }}
+                onArcCancel={() => setEditingCategory(null)}
+                onArcRemove={() => { clearLimit(category); setEditingCategory(null) }}
               />
             ))}
           </div>
@@ -626,7 +640,7 @@ function SummaryCell({ label, value, accent, color: colorProp, divider, clickabl
   )
 }
 
-function BudgetCard({ category, color, spent, limit, editValue, isSaving, highlight, onEditStart, onEditChange, onSave, onClear }) {
+function BudgetCard({ category, color, spent, limit, editValue, isSaving, highlight, onEditStart, onEditChange, onSave, onClear, isEditing, draftLimit, maxArcValue, onArcConfirm, onArcCancel, onArcRemove }) {
   const hasLimit = limit !== null
   const over     = hasLimit && spent > limit
   const pct      = hasLimit ? Math.min(spent / limit, 1) : 0
@@ -640,6 +654,7 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
       display: 'flex', flexDirection: 'column', gap: 0,
       boxShadow: highlight ? '0 0 0 2px hsl(0, 65%, 50%)' : 'none',
       transition: 'box-shadow 0.2s ease, background-color 0.2s ease',
+      position: 'relative', overflow: 'hidden',
     }}>
       {/* Header: dot + name + Edit/Set limit */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -692,55 +707,18 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
         )}
       </div>
 
-      {/* Edit row — appended below when active */}
-      {editValue !== null && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
-          <span style={{ fontSize: 13, color: 'var(--color-muted-text)', flexShrink: 0 }}>$</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={editValue}
-            onChange={e => onEditChange(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && onSave()}
-            autoFocus
-            placeholder="0"
-            style={{
-              flex: 1,
-              border: '1px solid var(--color-border)',
-              borderRadius: 8, padding: '6px 10px',
-              fontSize: 14, fontFamily: "'DM Sans', sans-serif",
-              backgroundColor: 'var(--color-bg)', color: 'var(--color-fg)', outline: 'none',
-            }}
-            onFocus={e => e.target.style.borderColor = 'hsl(145, 38%, 34%)'}
-            onBlur={e => e.target.style.borderColor = 'var(--color-border)'}
+      {isEditing && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 10, borderRadius: 'inherit', background: 'hsl(43,35%,95%)', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <ArcSlider
+            category={category}
+            spent={spent}
+            value={draftLimit}
+            maxValue={maxArcValue}
+            dotColor={color}
+            onConfirm={onArcConfirm}
+            onCancel={onArcCancel}
+            onRemove={onArcRemove}
           />
-          <button
-            onClick={onSave}
-            disabled={isSaving}
-            title="Save"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 32, height: 32, borderRadius: 8, border: 'none',
-              backgroundColor: 'var(--color-primary)', color: '#fff',
-              cursor: isSaving ? 'default' : 'pointer',
-              opacity: isSaving ? 0.6 : 1, flexShrink: 0,
-            }}
-          >
-            <Check size={14} />
-          </button>
-          <button
-            onClick={onClear}
-            title="Remove limit"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 12, fontWeight: 600, color: 'hsl(0, 60%, 48%)',
-              fontFamily: "'DM Sans', sans-serif", flexShrink: 0, padding: '0 2px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ✕ Clear
-          </button>
         </div>
       )}
     </div>

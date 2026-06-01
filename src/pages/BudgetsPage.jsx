@@ -650,10 +650,10 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
     <div style={{
       backgroundColor: highlight ? 'hsl(0, 65%, 97%)' : 'var(--color-bg-card)',
       border: '1px solid var(--color-border)',
-      borderRadius: 14, padding: 24, minHeight: 130,
+      borderRadius: 14, padding: 24, minHeight: isEditing ? '420px' : undefined,
       display: 'flex', flexDirection: 'column', gap: 0,
       boxShadow: highlight ? '0 0 0 2px hsl(0, 65%, 50%)' : 'none',
-      transition: 'box-shadow 0.2s ease, background-color 0.2s ease',
+      transition: 'box-shadow 0.2s ease, background-color 0.2s ease, min-height 0.2s ease',
       position: 'relative', overflow: 'hidden',
     }}>
       {/* Header: dot + name + Edit/Set limit */}
@@ -708,7 +708,7 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
       </div>
 
       {isEditing && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 10, borderRadius: 'inherit', background: 'hsl(43,35%,95%)', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 10, borderRadius: 'inherit', background: 'hsl(43,35%,95%)', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <ArcSlider
             category={category}
             spent={spent}

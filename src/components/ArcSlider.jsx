@@ -62,12 +62,7 @@ export default function ArcSlider({
   }
 
   return (
-    <div style={{
-      position: 'absolute', inset: 0, zIndex: 10, borderRadius: 'inherit', overflow: 'hidden',
-      backgroundColor: 'var(--color-bg-card)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      padding: '20px 20px 16px', boxSizing: 'border-box',
-    }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '8px 0' }}>
 
       {/* Category header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, alignSelf: 'flex-start' }}>

@@ -234,6 +234,24 @@ export default function BudgetsPage() {
     }
   }, [customFrom, customTo, period])
 
+  // ── Derived: historical average monthly spend per category ───────────────
+  const historicalScore = useMemo(() => {
+    const totals = {}
+    const months = new Set()
+    CATEGORIES.forEach(c => { totals[c] = 0 })
+    allTx.forEach(t => {
+      if (t.amount >= 0) return
+      if (totals[t.category] === undefined) return
+      const d = parseTxDate(t.date)
+      months.add(`${d.getFullYear()}-${d.getMonth()}`)
+      totals[t.category] = parseFloat((totals[t.category] + Math.abs(t.amount)).toFixed(2))
+    })
+    const numMonths = Math.max(months.size, 1)
+    const scores = {}
+    CATEGORIES.forEach(c => { scores[c] = totals[c] / numMonths })
+    return scores
+  }, [allTx])
+
   // ── Derived: spending aggregated by period ────────────────────────────────
   const spending = useMemo(() => {
     const { start, end } = getPeriodRange(period, customFrom, customTo)
@@ -563,7 +581,11 @@ export default function BudgetsPage() {
 
           {/* Budget cards grid */}
           <div ref={cardsGridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-            {[...CATEGORIES].sort((a, b) => (spending[b] ?? 0) - (spending[a] ?? 0)).map(category => (
+            {[...CATEGORIES].sort((a, b) => {
+                const ha = historicalScore[a] ?? spending[a] ?? 0
+                const hb = historicalScore[b] ?? spending[b] ?? 0
+                return hb - ha
+              }).map(category => (
               <BudgetCard
                 key={category}
                 category={category}
@@ -654,7 +676,7 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
       display: 'flex', flexDirection: 'column', gap: 0,
       boxShadow: highlight ? '0 0 0 2px hsl(0, 65%, 50%)' : 'none',
       transition: 'box-shadow 0.2s ease, background-color 0.2s ease, min-height 0.2s ease',
-      position: 'relative', overflow: 'hidden',
+      position: 'relative', overflow: 'visible',
     }}>
       {/* Header: dot + name + Edit/Set limit */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -665,7 +687,7 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
           }} />
           <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-fg)' }}>{category}</span>
         </div>
-        {editValue === null && (
+        {!isEditing && (
           hasLimit ? (
             <button onClick={onEditStart} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--color-muted-text)', padding: 0, fontFamily: "'DM Sans', sans-serif" }}>
               Edit
@@ -676,39 +698,50 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
             </button>
           )
         )}
+        {isEditing && hasLimit && (
+          <button onClick={onArcRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'hsl(0,65%,50%)', fontFamily: 'DM Sans, sans-serif', padding: '0', marginLeft: 'auto' }}>
+            Remove limit
+          </button>
+        )}
       </div>
 
       {/* Body: spending info — always visible */}
       <div style={{ flex: 1 }}>
         {hasLimit ? (
           <>
-            <div style={{ height: 6, borderRadius: 4, backgroundColor: 'var(--color-muted-bg)', overflow: 'hidden', marginBottom: 10 }}>
-              <div style={{
-                height: '100%', width: `${pct * 100}%`, borderRadius: 4,
-                backgroundColor: over ? 'hsl(0, 60%, 52%)' : color,
-                transition: 'width 0.4s ease',
-              }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 12, color: 'var(--color-muted-text)' }}>
-                ${fmt(spent)} <span style={{ opacity: 0.7 }}>of ${fmt(limit)}</span>
-              </span>
-              {over ? (
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'hsl(0, 60%, 48%)' }}>${fmt(diff)} over</span>
-              ) : (
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'hsl(145, 38%, 34%)' }}>${fmt(diff)} left</span>
-              )}
-            </div>
+            {!isEditing && (
+              <div style={{ height: 6, borderRadius: 4, backgroundColor: 'var(--color-muted-bg)', overflow: 'hidden', marginBottom: 10 }}>
+                <div style={{
+                  height: '100%', width: `${pct * 100}%`, borderRadius: 4,
+                  backgroundColor: over ? 'hsl(0, 60%, 52%)' : color,
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+            )}
+            {!isEditing && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 12, color: 'var(--color-muted-text)' }}>
+                  ${fmt(spent)} <span style={{ opacity: 0.7 }}>of ${fmt(limit)}</span>
+                </span>
+                {over ? (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'hsl(0, 60%, 48%)' }}>${fmt(diff)} over</span>
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'hsl(145, 38%, 34%)' }}>${fmt(diff)} left</span>
+                )}
+              </div>
+            )}
           </>
         ) : (
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
-            ${fmt(spent)}
-          </div>
+          !isEditing && (
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
+              ${fmt(spent)}
+            </div>
+          )
         )}
       </div>
 
       {isEditing && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 10, borderRadius: 'inherit', background: 'hsl(43,35%,95%)', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 10, borderRadius: 'inherit', background: 'hsl(43,35%,95%)', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <ArcSlider
             category={category}
             spent={spent}

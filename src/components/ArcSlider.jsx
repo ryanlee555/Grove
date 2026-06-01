@@ -64,17 +64,6 @@ export default function ArcSlider({
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '8px 0' }}>
 
-      {/* Category header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, alignSelf: 'flex-start' }}>
-        <span style={{
-          width: 10, height: 10, borderRadius: '50%',
-          backgroundColor: dotColor, flexShrink: 0, display: 'inline-block',
-        }} />
-        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 600, color: 'var(--color-fg)' }}>
-          {category}
-        </span>
-      </div>
-
       {/* Arc slider */}
       <div style={{ position: 'relative', width: 232, height: 230, flexShrink: 0 }}>
         <svg
@@ -149,43 +138,33 @@ export default function ArcSlider({
         )}
       </div>
 
-      {/* Confirm */}
-      <button
-        onClick={() => onConfirm(val)}
-        style={{
-          width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
-          backgroundColor: 'hsl(145,38%,34%)', color: '#fff',
-          fontSize: 14, fontWeight: 600, cursor: 'pointer',
-          fontFamily: "'DM Sans', sans-serif", marginBottom: 8,
-        }}
-      >
-        Confirm
-      </button>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {/* Confirm */}
+        <button
+          onClick={() => onConfirm(val)}
+          style={{
+            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
+            backgroundColor: 'hsl(145,38%,34%)', color: '#fff',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Confirm
+        </button>
 
-      {/* Cancel */}
-      <button
-        onClick={onCancel}
-        style={{
-          width: '100%', padding: '10px 0', borderRadius: 10,
-          background: '#fcebeb', color: '#a32d2d', border: '1.5px solid #f09595',
-          fontSize: 14, fontWeight: 600, cursor: 'pointer',
-          fontFamily: "'DM Sans', sans-serif", marginBottom: 6,
-        }}
-      >
-        Cancel
-      </button>
-
-      {/* Remove limit */}
-      <button
-        onClick={onRemove}
-        style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: 'hsl(0,65%,50%)', fontSize: 12,
-          fontFamily: "'DM Sans', sans-serif", padding: '2px 0',
-        }}
-      >
-        Remove limit
-      </button>
+        {/* Cancel */}
+        <button
+          onClick={onCancel}
+          style={{
+            width: '100%', padding: '10px 0', borderRadius: 10,
+            background: '#fcebeb', color: '#a32d2d', border: '1.5px solid #f09595',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }

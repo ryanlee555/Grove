@@ -1018,6 +1018,8 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const [cardNameMap,   setCardNameMap]   = useState({})  // account_id -> display name
   const [cardColorMap,  setCardColorMap]  = useState({})  // display name -> color
   const [accountSettings, setAccountSettings] = useState({})  // account_id -> { custom_name, hidden }
+  const [accountOrder, setAccountOrder] = useState([])
+  const [dragOver, setDragOver] = useState(null)
   const [txLoading,     setTxLoading]     = useState(true)
   const [txError,       setTxError]       = useState('')
   const [dashBudgets,   setDashBudgets]   = useState({})
@@ -1109,12 +1111,12 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         // Fetch account settings (custom names + hidden status)
         const { data: acctRows } = await supabase
           .from('account_settings')
-          .select('account_id, custom_name, hidden')
+          .select('account_id, custom_name, hidden, sort_order')
           .eq('user_id', user.id)
 
         const settingsMap = {}
         ;(acctRows || []).forEach(r => {
-          settingsMap[r.account_id] = { custom_name: r.custom_name ?? null, hidden: r.hidden ?? false }
+          settingsMap[r.account_id] = { custom_name: r.custom_name ?? null, hidden: r.hidden ?? false, sort_order: r.sort_order ?? 9999 }
         })
 
         // Apply custom name overrides to the name/color maps
@@ -1138,6 +1140,12 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         setCardNameMap({ ...localNameMap })
         setCardColorMap({ ...localColorMap })
         setAccountSettings(settingsMap)
+        const ordered = [...(data.accounts ?? [])].sort((a, b) => {
+          const aOrder = settingsMap[a.account_id]?.sort_order ?? 9999
+          const bOrder = settingsMap[b.account_id]?.sort_order ?? 9999
+          return aOrder - bOrder
+        })
+        setAccountOrder(ordered.map(a => a.account_id))
         setTxLoading(false)
     }
 
@@ -1280,6 +1288,19 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     }, { onConflict: 'user_id,account_id' })
   }
 
+  const handleReorder = async (newOrderIds) => {
+    setAccountOrder(newOrderIds)
+    const { data: { user } } = await supabase.auth.getUser()
+    const upserts = newOrderIds.map((accountId, i) => ({
+      user_id: user.id,
+      account_id: accountId,
+      custom_name: accountSettings[accountId]?.custom_name ?? null,
+      hidden: accountSettings[accountId]?.hidden ?? false,
+      sort_order: i,
+    }))
+    await supabase.from('account_settings').upsert(upserts, { onConflict: 'user_id,account_id' })
+  }
+
   // ── Data ─────────────────────────────────────────────────────────────────────
   const transactions = useMemo(() => {
     return allTx.filter(t => {
@@ -1335,6 +1356,14 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   }, [byCategory, dashBudgets])
   const rangeDays     = Math.max(1, Math.ceil((selectedPeriod.end - selectedPeriod.start) / (1000*60*60*24)) + 1)
   const dailyAvg      = totalSpent / rangeDays
+
+  const sortedAccounts = useMemo(() => {
+    const visibleIds = accountOrder.filter(id => !(accountSettings[id]?.hidden ?? false))
+    const hiddenIds  = accountOrder.filter(id =>   accountSettings[id]?.hidden ?? false)
+    const unseenIds  = accounts.map(a => a.account_id).filter(id => !accountOrder.includes(id))
+    const finalOrder = [...visibleIds, ...unseenIds, ...hiddenIds]
+    return finalOrder.map(id => accounts.find(a => a.account_id === id)).filter(Boolean)
+  }, [accountOrder, accountSettings, accounts])
 
   return (
     <div>
@@ -1475,15 +1504,9 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                     Banks &amp; Credit / Debit Cards:
                   </p>
                   <div className="space-y-1" style={{ maxHeight: 160, overflowY: 'auto' }}>
-                    {(Object.keys(cardNameMap).length > 0
-                      ? Object.entries(cardNameMap)
-                      : accounts.map((a, i) => [a.account_id, (a.official_name?.trim() || a.name || '') + (a.mask ? ` ••${a.mask}` : `Card ${i + 1}`)])
-                    ).sort(([aId], [bId]) => {
-                      const aHidden = accountSettings[aId]?.hidden ?? false
-                      const bHidden = accountSettings[bId]?.hidden ?? false
-                      if (aHidden === bHidden) return 0
-                      return aHidden ? 1 : -1
-                    }).map(([accountId, plaidName]) => {
+                    {sortedAccounts.map((acct, _i) => {
+                      const accountId = acct.account_id
+                      const plaidName = cardNameMap[accountId] ?? ((acct.official_name?.trim() || acct.name || '') + (acct.mask ? ` ••${acct.mask}` : ''))
                       const isHidden = accountSettings[accountId]?.hidden ?? false
                       const displayName = accountSettings[accountId]?.custom_name || plaidName
                       const color = cardColorMap[plaidName] ?? cardColorMap[displayName] ?? CARD_PALETTE[0]
@@ -1494,7 +1517,36 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                       const isHovered = hoveredCardId === accountId
                       return (
                         <div key={accountId}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, opacity: isHidden ? 0.4 : 1, transition: 'opacity 0.15s' }}
+                          draggable={!isHidden}
+                          onDragStart={!isHidden ? (e) => {
+                            e.dataTransfer.setData('text/plain', accountId)
+                            e.currentTarget.style.opacity = '0.4'
+                          } : undefined}
+                          onDragEnd={!isHidden ? (e) => {
+                            e.currentTarget.style.opacity = '1'
+                            setDragOver(null)
+                          } : undefined}
+                          onDragOver={!isHidden ? (e) => {
+                            e.preventDefault()
+                            setDragOver(accountId)
+                          } : undefined}
+                          onDragLeave={!isHidden ? () => setDragOver(null) : undefined}
+                          onDrop={!isHidden ? (e) => {
+                            e.preventDefault()
+                            setDragOver(null)
+                            const fromId = e.dataTransfer.getData('text/plain')
+                            if (fromId === accountId) return
+                            const currentVisible = accountOrder.filter(id => !(accountSettings[id]?.hidden ?? false))
+                            const fromIdx = currentVisible.indexOf(fromId)
+                            const toIdx   = currentVisible.indexOf(accountId)
+                            if (fromIdx === -1 || toIdx === -1) return
+                            const reordered = [...currentVisible]
+                            reordered.splice(fromIdx, 1)
+                            reordered.splice(toIdx, 0, fromId)
+                            const hidden = accountOrder.filter(id => accountSettings[id]?.hidden ?? false)
+                            handleReorder([...reordered, ...hidden])
+                          } : undefined}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, opacity: isHidden ? 0.4 : 1, transition: 'opacity 0.15s', cursor: isHidden ? 'default' : 'grab', outline: dragOver === accountId ? '2px solid hsl(145,38%,34%)' : 'none', borderRadius: 8 }}
                           onMouseEnter={() => setHoveredCardId(accountId)}
                           onMouseLeave={() => setHoveredCardId(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>

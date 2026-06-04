@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts'
 import LeafIcon from '../components/LeafIcon'
+import ArcSlider from '../components/ArcSlider'
 
 // ─── JS smooth scroll (easeInOutQuad, ~800ms) ─────────────────────────────────
 function smoothScrollTo(element, duration = 800) {
@@ -634,24 +635,32 @@ function BudgetTrackerCard() {
 
 // ─── How It Works — two-column layout with scroll animations ─────────────────
 function HowItWorksSection() {
-  const card1Ref = useRef(null)
-  const card2Ref = useRef(null)
+  const sectionRef = useRef(null)
+  const card1Ref   = useRef(null)
   const [card1Visible, setCard1Visible] = useState(false)
-  const [card2Visible, setCard2Visible] = useState(false)
+  const [parallaxY,    setParallaxY]    = useState(0)
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => entries.forEach(e => {
-        if (e.isIntersecting) {
-          if (e.target === card1Ref.current) setCard1Visible(true)
-          if (e.target === card2Ref.current) setCard2Visible(true)
-        }
+        if (e.isIntersecting && e.target === card1Ref.current) setCard1Visible(true)
       }),
       { threshold: 0.12 }
     )
     if (card1Ref.current) observer.observe(card1Ref.current)
-    if (card2Ref.current) observer.observe(card2Ref.current)
     return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (!sectionRef.current) return
+      const rect = sectionRef.current.getBoundingClientRect()
+      const progress = Math.max(0, Math.min(1, 1 - rect.bottom / (rect.height + window.innerHeight)))
+      setParallaxY(20 - progress * 40)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   const steps = [
@@ -673,7 +682,7 @@ function HowItWorksSection() {
   ]
 
   return (
-    <div style={{ background: 'linear-gradient(to bottom, hsl(140, 16%, 92%), var(--color-bg))', position: 'relative', overflow: 'hidden' }}>
+    <div ref={sectionRef} style={{ background: 'linear-gradient(to bottom, hsl(140, 16%, 92%), var(--color-bg))', position: 'relative', overflow: 'hidden' }}>
       <div className="absolute pointer-events-none rounded-full"
         style={{ width: 520, height: 520, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'var(--color-secondary)', opacity: 0.15, zIndex: 0 }} />
       <section id="how-it-works" className="max-w-7xl mx-auto px-10 py-24" style={{ position: 'relative', zIndex: 1 }}>
@@ -722,25 +731,151 @@ function HowItWorksSection() {
             </div>
           </div>
 
-          {/* Right column — two stacked preview cards */}
+          {/* Right column — single card with parallax */}
           <div className="flex-1 min-w-0 flex flex-col gap-5 w-full">
             <div ref={card1Ref} style={{
-              transform: card1Visible ? 'translateX(0)' : 'translateX(40px)',
+              transform: `translateX(${card1Visible ? 0 : 40}px) translateY(${parallaxY}px)`,
               opacity: card1Visible ? 1 : 0,
               transition: 'transform 600ms ease-out, opacity 600ms ease-out',
             }}>
               <SpendingBreakdownCard />
             </div>
-            <div ref={card2Ref} style={{
-              transform: card2Visible ? 'translateX(0)' : 'translateX(40px)',
-              opacity: card2Visible ? 1 : 0,
-              transition: 'transform 600ms ease-out, opacity 600ms ease-out',
-              transitionDelay: '150ms',
-            }}>
-              <BudgetTrackerCard />
-            </div>
           </div>
 
+        </div>
+      </section>
+    </div>
+  )
+}
+
+// ─── Budget showcase card ─────────────────────────────────────────────────────
+function BudgetShowcaseCard({ category, spent, initialLimit, dotColor, delay = 0 }) {
+  const [limit,     setLimit]     = useState(initialLimit)
+  const [isEditing, setIsEditing] = useState(false)
+
+  const pct    = limit > 0 ? Math.min(spent / limit, 1) : 0
+  const isOver = spent > limit
+  const isWarn = !isOver && pct > 0.8
+  const barColor = isOver ? 'hsl(0,65%,50%)' : isWarn ? 'hsl(42,68%,58%)' : 'hsl(145,38%,34%)'
+
+  return (
+    <div
+      className="animate-on-scroll"
+      onClick={() => { if (!isEditing) setIsEditing(true) }}
+      style={{
+        backgroundColor: 'var(--color-bg-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 16,
+        padding: 20,
+        position: 'relative',
+        cursor: 'pointer',
+        transitionDelay: `${delay}ms`,
+        minHeight: isEditing ? 440 : undefined,
+        overflow: 'visible',
+      }}
+    >
+      {isOver && (
+        <div style={{
+          position: 'absolute', top: -6, right: -6,
+          width: 20, height: 20, borderRadius: '50%',
+          backgroundColor: 'hsl(0,65%,50%)', color: '#fff',
+          fontSize: 11, fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2,
+        }}>!</div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: dotColor, display: 'inline-block', flexShrink: 0 }} />
+        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: 'var(--color-fg)' }}>
+          {category}
+        </span>
+      </div>
+
+      <div style={{ height: 6, borderRadius: 4, backgroundColor: 'var(--color-muted-bg)', overflow: 'hidden', marginBottom: 8 }}>
+        <div style={{ height: '100%', width: `${pct * 100}%`, borderRadius: 4, backgroundColor: barColor, transition: 'width 0.4s ease' }} />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontFamily: "'DM Sans', sans-serif", color: 'var(--color-muted-text)' }}>
+        <span>${spent} spent</span>
+        <span style={{ color: isOver ? 'hsl(0,65%,50%)' : 'var(--color-muted-text)' }}>
+          {isOver ? `$${spent - limit} over` : `$${limit} limit`}
+        </span>
+      </div>
+
+      {isEditing && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 10, borderRadius: 'inherit',
+          background: 'hsl(43,35%,95%)', padding: '16px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+        }}>
+          <ArcSlider
+            category={category}
+            spent={spent}
+            value={limit}
+            maxValue={Math.max(3000, Math.ceil(spent / 500) * 500 + 500)}
+            dotColor={dotColor}
+            onConfirm={(val) => { setLimit(val); setIsEditing(false) }}
+            onCancel={() => setIsEditing(false)}
+            onRemove={() => setIsEditing(false)}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Budgets feature section ──────────────────────────────────────────────────
+const BUDGET_SHOWCASE = [
+  { category: 'Food & Dining', spent: 312, initialLimit: 350, dotColor: 'hsl(145,38%,34%)' },
+  { category: 'Shopping',      spent: 178, initialLimit: 150, dotColor: 'hsl(340,30%,55%)' },
+  { category: 'Transport',     spent: 54,  initialLimit: 120, dotColor: 'hsl(25,55%,52%)'  },
+  { category: 'Entertainment', spent: 89,  initialLimit: 100, dotColor: 'hsl(42,68%,58%)'  },
+]
+
+function BudgetsFeatureSection() {
+  return (
+    <div style={{ background: 'linear-gradient(to bottom, hsl(140, 16%, 92%), var(--color-bg))' }}>
+      <section id="budgets-feature" className="max-w-7xl mx-auto px-10 py-24">
+        <div className="text-center mb-12">
+          <p className="animate-on-scroll text-[11px] font-bold uppercase tracking-widest mb-3"
+            style={{ color: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif" }}>
+            BUDGETING
+          </p>
+          <h2 className="animate-on-scroll font-bold mb-4"
+            style={{ fontFamily: "'Playfair Display', serif", fontSize: 38, color: 'var(--color-fg)' }}>
+            Set limits. Watch them work.
+          </h2>
+          <p className="animate-on-scroll text-[16px]"
+            style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+            Tap any card to open the budget editor.
+          </p>
+        </div>
+        <div className="animate-on-scroll" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, maxWidth: 780, margin: '0 auto 48px', borderTop: '1px solid var(--color-border)' }}>
+          {[
+            { title: 'Set limits',      tag: 'per category',    body: 'Set a monthly cap for any category you care about.' },
+            { title: 'Track your pace', tag: 'updated live',    body: "Spending updates as transactions arrive, so you're never caught off guard." },
+            { title: 'Stay aware',      tag: 'badges when over', body: 'An ! badge appears the moment you go over your limit.' },
+          ].map(({ title, tag, body }) => (
+            <div key={title} style={{ padding: '24px 24px 24px 0', borderRight: '1px solid var(--color-border)', paddingRight: 24 }}
+              className="last:border-r-0">
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, color: 'var(--color-fg)', marginBottom: 2 }}>
+                {title}
+              </p>
+              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                {tag}
+              </p>
+              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, lineHeight: 1.65, color: 'var(--color-muted-text)' }}>
+                {body}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, maxWidth: 780, margin: '0 auto' }}>
+          {BUDGET_SHOWCASE.map((card, i) => (
+            <BudgetShowcaseCard key={card.category} {...card} delay={i * 100} />
+          ))}
         </div>
       </section>
     </div>
@@ -752,19 +887,20 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
 
   const NAV_LINKS = [
-    { label: 'Features',     href: '#features'     },
-    { label: 'How it works', href: '#how-it-works' },
-    { label: 'About',        href: '#about'        },
+    { label: 'Features',     href: '#features'        },
+    { label: 'How it works', href: '#how-it-works'    },
+    { label: 'Budgets',      href: '#budgets-feature' },
+    { label: 'About',        href: '#about'           },
   ]
 
   const FEATURES_ROW1 = [
-    { icon: <IconChart   color="hsl(145,38%,34%)" />, iconBg: 'hsl(140,30%,88%)', title: 'Effortless tracking', body: 'Your spending organizes itself into categories you actually understand. No manual entry, no mystery.' },
-    { icon: <IconTarget  color="hsl(42,68%,45%)"  />, iconBg: 'hsl(42,68%,90%)',  title: 'Goals that stick',    body: 'Set savings goals that fit your life. Grove shows your progress gently, without guilt trips.' },
-    { icon: <IconSparkle color="hsl(145,38%,34%)" />, iconBg: 'hsl(140,30%,88%)', title: 'Smart suggestions',   body: 'Personalized nudges arrive exactly when you need them — quiet guidance, never pressure.' },
+    { icon: <IconChart   color="hsl(145,38%,34%)" />, iconBg: 'hsl(140,30%,88%)', title: 'Effortless tracking', body: 'Every transaction auto-categorized across all your accounts — Chase, SoFi, and more. Grove maps your real spending in real time.' },
+    { icon: <IconTarget  color="hsl(42,68%,45%)"  />, iconBg: 'hsl(42,68%,90%)',  title: 'Smart budgeting',    body: 'Set monthly limits per category. Grove tracks your pace and shows exactly where you stand — no guesswork.' },
+    { icon: <IconSparkle color="hsl(145,38%,34%)" />, iconBg: 'hsl(140,30%,88%)', title: 'Edit & customize',   body: "Rename transactions, fix categories, or delete anything that doesn't belong. Your data, your rules." },
   ]
   const FEATURES_ROW2 = [
     { icon: <IconShield color="hsl(145,38%,34%)" />, iconBg: 'hsl(140,30%,88%)', title: 'Bank-grade security', body: "256-bit encryption and read-only access. We see nothing we don't need — and keep it safe." },
-    { icon: <IconBell   color="hsl(42,68%,45%)"  />, iconBg: 'hsl(42,68%,90%)',  title: 'Gentle alerts',       body: 'Spending nudges arrive as calm reminders, not alarms. You stay aware without feeling watched.' },
+    { icon: <IconChart  color="hsl(145,38%,34%)" />, iconBg: 'hsl(140,30%,88%)', title: 'Multi-bank support',  body: 'Connect Chase, SoFi, or any US bank. All your accounts in one clean view, automatically synced.' },
     { icon: <IconLock   color="hsl(145,38%,34%)" />, iconBg: 'hsl(140,30%,88%)', title: 'Total privacy',       body: 'Your data is yours. We never sell it, share it, or use it for advertising.' },
   ]
 
@@ -947,6 +1083,9 @@ export default function LandingPage() {
 
       {/* ── How it works ───────────────────────────────────────────────────── */}
       <HowItWorksSection />
+
+      {/* ── Budgets feature ────────────────────────────────────────────────── */}
+      <BudgetsFeatureSection />
 
       {/* ── About ──────────────────────────────────────────────────────────── */}
       <section id="about" className="max-w-7xl mx-auto px-10 py-24">

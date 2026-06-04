@@ -686,6 +686,17 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
       transition: 'box-shadow 0.2s ease, background-color 0.2s ease, min-height 0.2s ease',
       position: 'relative', overflow: 'visible',
     }}>
+      {hasLimit && over && !isEditing && (
+        <div style={{
+          position: 'absolute', top: -8, right: -8,
+          width: 20, height: 20, borderRadius: '50%',
+          backgroundColor: 'hsl(0,80%,50%)', color: '#fff',
+          fontSize: 11, fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10, pointerEvents: 'none',
+        }}>!</div>
+      )}
+
       {/* Header: dot + name + Edit/Set limit */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>

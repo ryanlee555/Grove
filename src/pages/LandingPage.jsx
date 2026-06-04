@@ -753,71 +753,95 @@ function BudgetShowcaseCard({ category, spent, initialLimit, dotColor, delay = 0
   const [limit,     setLimit]     = useState(initialLimit)
   const [isEditing, setIsEditing] = useState(false)
 
-  const pct    = limit > 0 ? Math.min(spent / limit, 1) : 0
-  const isOver = spent > limit
-  const isWarn = !isOver && pct > 0.8
+  const hasLimit = limit !== null
+  const pct      = hasLimit ? Math.min(spent / limit, 1) : 0
+  const isOver   = hasLimit && spent > limit
+  const isWarn   = hasLimit && !isOver && pct > 0.8
   const barColor = isOver ? 'hsl(0,65%,50%)' : isWarn ? 'hsl(42,68%,58%)' : 'hsl(145,38%,34%)'
+  const diff     = hasLimit ? Math.abs(limit - spent) : 0
 
   return (
     <div
       className="animate-on-scroll"
-      onClick={() => { if (!isEditing) setIsEditing(true) }}
       style={{
         backgroundColor: 'var(--color-bg-card)',
         border: '1px solid var(--color-border)',
         borderRadius: 16,
         padding: 20,
         position: 'relative',
-        cursor: 'pointer',
-        transitionDelay: `${delay}ms`,
-        minHeight: isEditing ? 440 : undefined,
         overflow: 'visible',
+        cursor: 'default',
+        transitionDelay: `${delay}ms`,
       }}
     >
-      {isOver && (
+      {/* "!" over-budget badge */}
+      {isOver && !isEditing && (
         <div style={{
-          position: 'absolute', top: -6, right: -6,
+          position: 'absolute', top: -8, right: -8,
           width: 20, height: 20, borderRadius: '50%',
-          backgroundColor: 'hsl(0,65%,50%)', color: '#fff',
+          backgroundColor: 'hsl(0,80%,50%)', color: '#fff',
           fontSize: 11, fontWeight: 700,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 2,
+          zIndex: 10, pointerEvents: 'none',
         }}>!</div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: dotColor, display: 'inline-block', flexShrink: 0 }} />
-        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: 'var(--color-fg)' }}>
-          {category}
-        </span>
+      {/* Top row: dot + name + Edit / Remove limit */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isEditing ? 0 : 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: dotColor, display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 600, color: 'var(--color-fg)' }}>
+            {category}
+          </span>
+        </div>
+        {isEditing ? (
+          <button
+            onClick={() => { setLimit(null); setIsEditing(false) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'hsl(0,60%,48%)', fontFamily: "'DM Sans', sans-serif", padding: 0 }}>
+            Remove limit
+          </button>
+        ) : (
+          <button
+            onClick={() => setIsEditing(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif", padding: 0 }}>
+            Edit
+          </button>
+        )}
       </div>
 
-      <div style={{ height: 6, borderRadius: 4, backgroundColor: 'var(--color-muted-bg)', overflow: 'hidden', marginBottom: 8 }}>
-        <div style={{ height: '100%', width: `${pct * 100}%`, borderRadius: 4, backgroundColor: barColor, transition: 'width 0.4s ease' }} />
-      </div>
+      {/* Progress bar + spend row — hidden while editing or no limit */}
+      {!isEditing && (
+        <>
+          {hasLimit && (
+            <div style={{ height: 6, borderRadius: 3, backgroundColor: 'var(--color-muted-bg)', overflow: 'hidden', marginBottom: 10 }}>
+              <div style={{ height: '100%', width: `${pct * 100}%`, borderRadius: 3, backgroundColor: barColor, transition: 'width 0.4s ease' }} />
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+            <span style={{ color: 'var(--color-muted-text)' }}>
+              ${spent}{hasLimit && <span style={{ opacity: 0.7 }}> of ${limit}</span>}
+            </span>
+            {hasLimit && (isOver ? (
+              <span style={{ fontWeight: 600, color: 'hsl(0,60%,48%)' }}>${diff} over</span>
+            ) : (
+              <span style={{ fontWeight: 600, color: 'hsl(145,38%,34%)' }}>${diff} left</span>
+            ))}
+          </div>
+        </>
+      )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontFamily: "'DM Sans', sans-serif", color: 'var(--color-muted-text)' }}>
-        <span>${spent} spent</span>
-        <span style={{ color: isOver ? 'hsl(0,65%,50%)' : 'var(--color-muted-text)' }}>
-          {isOver ? `$${spent - limit} over` : `$${limit} limit`}
-        </span>
-      </div>
-
+      {/* ArcSlider — in normal flow, card grows around it */}
       {isEditing && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 10, borderRadius: 'inherit',
-          background: 'hsl(43,35%,95%)', padding: '16px',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-        }}>
+        <div style={{ marginTop: 12 }}>
           <ArcSlider
             category={category}
             spent={spent}
-            value={limit}
+            value={limit ?? 0}
             maxValue={Math.max(3000, Math.ceil(spent / 500) * 500 + 500)}
             dotColor={dotColor}
             onConfirm={(val) => { setLimit(val); setIsEditing(false) }}
             onCancel={() => setIsEditing(false)}
-            onRemove={() => setIsEditing(false)}
+            onRemove={() => { setLimit(null); setIsEditing(false) }}
           />
         </div>
       )}
@@ -846,31 +870,39 @@ function BudgetsFeatureSection() {
             style={{ fontFamily: "'Playfair Display', serif", fontSize: 38, color: 'var(--color-fg)' }}>
             Set limits. Watch them work.
           </h2>
-          <p className="animate-on-scroll text-[16px]"
-            style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
-            Tap any card to open the budget editor.
-          </p>
         </div>
-        <div className="animate-on-scroll" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, maxWidth: 780, margin: '0 auto 48px', borderTop: '1px solid var(--color-border)' }}>
+        <div className="animate-on-scroll" style={{
+          display: 'grid', gridTemplateColumns: '1fr 1px 1fr 1px 1fr',
+          maxWidth: 780, margin: '0 auto 40px',
+          border: '1px solid var(--color-border)', borderRadius: 16,
+          backgroundColor: 'var(--color-bg-card)', padding: '32px 24px',
+        }}>
           {[
-            { title: 'Set limits',      tag: 'per category',    body: 'Set a monthly cap for any category you care about.' },
-            { title: 'Track your pace', tag: 'updated live',    body: "Spending updates as transactions arrive, so you're never caught off guard." },
-            { title: 'Stay aware',      tag: 'badges when over', body: 'An ! badge appears the moment you go over your limit.' },
-          ].map(({ title, tag, body }) => (
-            <div key={title} style={{ padding: '24px 24px 24px 0', borderRight: '1px solid var(--color-border)', paddingRight: 24 }}
-              className="last:border-r-0">
-              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, color: 'var(--color-fg)', marginBottom: 2 }}>
-                {title}
-              </p>
-              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                {tag}
-              </p>
-              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, lineHeight: 1.65, color: 'var(--color-muted-text)' }}>
-                {body}
-              </p>
-            </div>
+            { title: 'Set limits',      tag: 'PER CATEGORY',    body: 'Set a monthly cap for any category you care about.' },
+            { title: 'Track your pace', tag: 'UPDATED LIVE',    body: "Spending updates as transactions arrive, so you're never caught off guard." },
+            { title: 'Stay aware',      tag: 'BADGES WHEN OVER', body: 'An ! badge appears the moment you go over your limit.' },
+          ].map(({ title, tag, body }, i) => (
+            <>
+              {i > 0 && <div key={`div-${i}`} style={{ width: 1, background: 'var(--color-border)', alignSelf: 'stretch', margin: 0 }} />}
+              <div key={title} style={{ textAlign: 'center', padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 8 }}>
+                  {tag}
+                </p>
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 600, color: 'var(--color-fg)', marginBottom: 8 }}>
+                  {title}
+                </p>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, lineHeight: 1.65, color: 'var(--color-muted-text)', maxWidth: 180 }}>
+                  {body}
+                </p>
+              </div>
+            </>
           ))}
         </div>
+
+        <p className="animate-on-scroll text-center text-[16px]"
+          style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif", marginTop: 16, marginBottom: 32 }}>
+          Tap any card to open the budget editor.
+        </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, maxWidth: 780, margin: '0 auto' }}>
           {BUDGET_SHOWCASE.map((card, i) => (

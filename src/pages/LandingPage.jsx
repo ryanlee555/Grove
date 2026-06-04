@@ -685,14 +685,14 @@ function HowItWorksSection() {
     <div ref={sectionRef} style={{ background: 'linear-gradient(to bottom, hsl(140, 16%, 92%), var(--color-bg))', position: 'relative', overflow: 'hidden' }}>
       <div className="absolute pointer-events-none rounded-full"
         style={{ width: 520, height: 520, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'var(--color-secondary)', opacity: 0.15, zIndex: 0 }} />
-      <section id="how-it-works" className="max-w-7xl mx-auto px-10 py-24" style={{ position: 'relative', zIndex: 1 }}>
+      <section id="spending" className="max-w-7xl mx-auto px-10 py-24" style={{ position: 'relative', zIndex: 1 }}>
         <div className="flex flex-col lg:flex-row gap-16 items-center">
 
           {/* Left column */}
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] mb-5"
               style={{ color: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif" }}>
-              How it works
+              Spending
             </p>
             <h2 className="animate-on-scroll font-bold leading-[1.15] mb-12"
               style={{
@@ -925,7 +925,7 @@ export default function LandingPage() {
 
   const NAV_LINKS = [
     { label: 'Features',     href: '#features'        },
-    { label: 'How it works', href: '#how-it-works'    },
+    { label: 'Spending', href: '#spending'    },
     { label: 'Budgets',      href: '#budgets-feature' },
     { label: 'About',        href: '#about'           },
   ]
@@ -1076,8 +1076,8 @@ export default function LandingPage() {
                 style={{ backgroundColor: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif", textDecoration: 'none' }}>
                 Get started free →
               </Link>
-              <a href="#how-it-works"
-                onClick={e => handleNavClick(e, '#how-it-works')}
+              <a href="#spending"
+                onClick={e => handleNavClick(e, '#spending')}
                 className="px-8 py-4 rounded-full text-[16px] font-semibold transition-opacity hover:opacity-70"
                 style={{ color: 'var(--color-fg)', fontFamily: "'DM Sans', sans-serif", border: '1.5px solid var(--color-border)', textDecoration: 'none' }}>
                 See how it works ↓

@@ -1107,15 +1107,14 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         const filteredTx = withOverrides.filter(t => !deletedIds.has(t.id))
 
         // Fetch account settings (custom names + hidden status)
-        // Note: table column is display_name; mapped to custom_name in JS
         const { data: acctRows } = await supabase
           .from('account_settings')
-          .select('account_id, display_name, hidden')
+          .select('account_id, custom_name, hidden')
           .eq('user_id', user.id)
 
         const settingsMap = {}
         ;(acctRows || []).forEach(r => {
-          settingsMap[r.account_id] = { custom_name: r.display_name ?? null, hidden: r.hidden ?? false }
+          settingsMap[r.account_id] = { custom_name: r.custom_name ?? null, hidden: r.hidden ?? false }
         })
 
         // Apply custom name overrides to the name/color maps
@@ -1245,7 +1244,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
   // ── Card settings handlers ────────────────────────────────────────────────────
   const handleRenameAccount = async (accountId, newName) => {
-    const trimmed = newName.trim()
+    const trimmed = (newName || '').trim()
     setEditingCardId(null)
     const oldName = cardNameMap[accountId]
     const color = cardColorMap[oldName] ?? CARD_PALETTE[0]
@@ -1261,20 +1260,23 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     setAllTx(prev => prev.map(t => t.account_id === accountId ? { ...t, source: resolvedName } : t))
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('account_settings').upsert({
-      user_id: user.id, account_id: accountId,
-      display_name: trimmed || null,
+      user_id: user.id,
+      account_id: accountId,
+      custom_name: trimmed || null,
       hidden: accountSettings[accountId]?.hidden ?? false,
     }, { onConflict: 'user_id,account_id' })
   }
 
   const handleToggleHideAccount = async (accountId) => {
     const current = accountSettings[accountId]?.hidden ?? false
-    setAccountSettings(prev => ({ ...prev, [accountId]: { ...prev[accountId], hidden: !current } }))
+    const next = !current
+    setAccountSettings(prev => ({ ...prev, [accountId]: { ...prev[accountId], hidden: next } }))
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('account_settings').upsert({
-      user_id: user.id, account_id: accountId,
-      display_name: accountSettings[accountId]?.custom_name ?? null,
-      hidden: !current,
+      user_id: user.id,
+      account_id: accountId,
+      custom_name: accountSettings[accountId]?.custom_name ?? null,
+      hidden: next,
     }, { onConflict: 'user_id,account_id' })
   }
 
@@ -1476,7 +1478,12 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                     {(Object.keys(cardNameMap).length > 0
                       ? Object.entries(cardNameMap)
                       : accounts.map((a, i) => [a.account_id, (a.official_name?.trim() || a.name || '') + (a.mask ? ` ••${a.mask}` : `Card ${i + 1}`)])
-                    ).map(([accountId, plaidName]) => {
+                    ).sort(([aId], [bId]) => {
+                      const aHidden = accountSettings[aId]?.hidden ?? false
+                      const bHidden = accountSettings[bId]?.hidden ?? false
+                      if (aHidden === bHidden) return 0
+                      return aHidden ? 1 : -1
+                    }).map(([accountId, plaidName]) => {
                       const isHidden = accountSettings[accountId]?.hidden ?? false
                       const displayName = accountSettings[accountId]?.custom_name || plaidName
                       const color = cardColorMap[plaidName] ?? cardColorMap[displayName] ?? CARD_PALETTE[0]

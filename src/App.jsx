@@ -1015,11 +1015,17 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   // Unified transaction store (Plaid + manual), each tx has a stable id
   const [allTx,        setAllTx]        = useState([])
   const [accounts,     setAccounts]     = useState([])
-  const [cardNameMap,  setCardNameMap]  = useState({})  // account_id -> display name
-  const [cardColorMap, setCardColorMap] = useState({})  // display name -> color
-  const [txLoading,    setTxLoading]    = useState(true)
-  const [txError,      setTxError]      = useState('')
-  const [dashBudgets,  setDashBudgets]  = useState({})
+  const [cardNameMap,         setCardNameMap]         = useState({})  // account_id -> display name
+  const [cardColorMap,        setCardColorMap]        = useState({})  // display name -> color
+  const [accountDisplayNames, setAccountDisplayNames] = useState({})  // account_id -> custom name
+  const [hiddenAccounts,      setHiddenAccounts]      = useState(new Set())
+  const [txLoading,           setTxLoading]           = useState(true)
+  const [txError,             setTxError]             = useState('')
+  const [dashBudgets,         setDashBudgets]         = useState({})
+  const [editingCardId,   setEditingCardId]   = useState(null)
+  const [editCardName,    setEditCardName]    = useState('')
+  const [hoveredCardId,   setHoveredCardId]   = useState(null)
+  const [showHiddenPanel, setShowHiddenPanel] = useState(false)
 
   useEffect(() => {
     async function loadTransactions() {
@@ -1035,6 +1041,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       })
 
       const data = await res.json()
+      console.log('accounts from API:', data.accounts)
 
       if (!res.ok || !data.transactions) {
         setTxError('Failed to load transactions. Please refresh.')
@@ -1047,13 +1054,11 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       const localNameMap = {}
       const localColorMap = {}
       accountsData.forEach((a, i) => {
-        const displayName = (a.official_name || a.name) + (a.mask ? ` ••${a.mask}` : '')
-        localNameMap[a.account_id] = displayName
-        localColorMap[displayName] = CARD_PALETTE[i % CARD_PALETTE.length]
+        const baseName = (a.official_name && a.official_name.trim()) ? a.official_name.trim() : (a.name ?? '')
+        const displayName = baseName + (a.mask ? ` ••${a.mask}` : '')
+        localNameMap[a.account_id] = displayName || `Card ••${a.mask ?? '????'}`
+        localColorMap[localNameMap[a.account_id]] = CARD_PALETTE[i % CARD_PALETTE.length]
       })
-      setCardNameMap(localNameMap)
-      setCardColorMap(localColorMap)
-
       const mapped = data.transactions
         .filter(t => {
           const primary = t.personal_finance_category?.primary ?? ''
@@ -1073,7 +1078,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
           category:         plaidCategoryToGrove(t.personal_finance_category?.detailed ?? '', t.merchant_name || t.name),
           amount:           -t.amount, // Plaid positive = debit, negative = credit
           account_id:       t.account_id,
-          source:           localNameMap[t.account_id] ?? t.account_id,
+          source:           localNameMap[t.account_id] ?? 'Unknown Card',
           institution_name: t.institution_name ?? null,
         }))
 
@@ -1101,12 +1106,42 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
           .eq('user_id', user.id)
 
         const deletedIds = new Set((deletedRows || []).map(r => r.transaction_id))
-        console.log('deletedRows:', deletedRows)
-        console.log('deletedIds:', [...deletedIds])
-        console.log('sample tx ids:', withOverrides.slice(0, 3).map(t => t.id))
-        setAllTx(withOverrides.filter(t => !deletedIds.has(t.id)))
+        const filteredTx = withOverrides.filter(t => !deletedIds.has(t.id))
+
+        // Fetch account settings (custom names + hidden status)
+        const { data: acctSettings } = await supabase
+          .from('account_settings')
+          .select('account_id, display_name, hidden')
+          .eq('user_id', user.id)
+
+        const localDisplayNames = {}
+        const localHidden = new Set()
+        ;(acctSettings || []).forEach(s => {
+          if (s.display_name) localDisplayNames[s.account_id] = s.display_name
+          if (s.hidden) localHidden.add(s.account_id)
+        })
+
+        // Apply display name overrides to the name/color maps
+        Object.entries(localDisplayNames).forEach(([accountId, displayName]) => {
+          const oldName = localNameMap[accountId]
+          if (oldName && oldName !== displayName) {
+            const color = localColorMap[oldName]
+            delete localColorMap[oldName]
+            localColorMap[displayName] = color
+          }
+          localNameMap[accountId] = displayName
+        })
+
+        // Set transactions with final (override-applied) source names
+        setAllTx(filteredTx.map(t => ({
+          ...t,
+          source: localNameMap[t.account_id] ?? t.source,
+        })))
         setAccounts(data.accounts ?? [])
-        console.log('ACCOUNTS:', data.accounts)
+        setCardNameMap({ ...localNameMap })
+        setCardColorMap({ ...localColorMap })
+        setAccountDisplayNames(localDisplayNames)
+        setHiddenAccounts(localHidden)
         setTxLoading(false)
     }
 
@@ -1211,13 +1246,49 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     }, { onConflict: 'user_id,transaction_id' });
   };
 
+  // ── Card settings handlers ────────────────────────────────────────────────────
+  async function handleConfirmRename(accountId) {
+    const newName = editCardName.trim() || cardNameMap[accountId]
+    setEditingCardId(null)
+    const oldName = cardNameMap[accountId]
+    const color = cardColorMap[oldName] ?? CARD_PALETTE[0]
+    setCardNameMap(prev => ({ ...prev, [accountId]: newName }))
+    setCardColorMap(prev => { const n = { ...prev }; delete n[oldName]; n[newName] = color; return n })
+    setAccountDisplayNames(prev => ({ ...prev, [accountId]: newName }))
+    setAllTx(prev => prev.map(t => t.account_id === accountId ? { ...t, source: newName } : t))
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('account_settings').upsert(
+      { user_id: user.id, account_id: accountId, display_name: newName },
+      { onConflict: 'user_id,account_id' }
+    )
+  }
+
+  async function handleHideCard(accountId) {
+    setHiddenAccounts(prev => new Set([...prev, accountId]))
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('account_settings').upsert(
+      { user_id: user.id, account_id: accountId, hidden: true },
+      { onConflict: 'user_id,account_id' }
+    )
+  }
+
+  async function handleShowCard(accountId) {
+    setHiddenAccounts(prev => { const n = new Set(prev); n.delete(accountId); return n })
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('account_settings').upsert(
+      { user_id: user.id, account_id: accountId, hidden: false },
+      { onConflict: 'user_id,account_id' }
+    )
+  }
+
   // ── Data ─────────────────────────────────────────────────────────────────────
   const transactions = useMemo(() => {
     return allTx.filter(t => {
+      if (hiddenAccounts.has(t.account_id)) return false
       const d = parseTxDate(t.date)
       return d >= selectedPeriod.start && d <= selectedPeriod.end
     })
-  }, [allTx, selectedPeriod])
+  }, [allTx, selectedPeriod, hiddenAccounts])
 
   const byCategory = useMemo(() => {
     const map = {}
@@ -1382,22 +1453,99 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                       style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
                       Credit / Debit Cards:
                     </p>
-                    {Object.entries(cardNameMap).map(([accountId, cardName]) => {
-                      const color = cardColorMap[cardName] ?? 'hsl(140, 16%, 68%)'
+                    {(Object.keys(cardNameMap).length > 0
+                      ? Object.entries(cardNameMap)
+                      : accounts.map((a, i) => [a.account_id, (a.official_name?.trim() || a.name || '') + (a.mask ? ` ••${a.mask}` : `Card ${i + 1}`)])
+                    ).filter(([accountId]) => !hiddenAccounts.has(accountId))
+                    .map(([accountId, cardName]) => {
+                      const color = cardColorMap[cardName] ?? CARD_PALETTE[0]
                       const amt = transactions.filter(t => t.account_id === accountId && t.amount < 0)
                         .reduce((s, t) => s + Math.abs(t.amount), 0)
+                      const isEditingThis = editingCardId === accountId
+                      const isHovered = hoveredCardId === accountId
                       return (
-                        <div key={accountId} className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+                        <div key={accountId}
+                          className="flex items-center justify-between gap-2"
+                          onMouseEnter={() => setHoveredCardId(accountId)}
+                          onMouseLeave={() => setHoveredCardId(null)}>
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                            <span className="text-base font-bold" style={{ color: 'var(--color-fg)' }}>{cardName}</span>
+                            {isEditingThis ? (
+                              <>
+                                <input
+                                  autoFocus
+                                  value={editCardName}
+                                  onChange={e => setEditCardName(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleConfirmRename(accountId)
+                                    if (e.key === 'Escape') setEditingCardId(null)
+                                  }}
+                                  style={{
+                                    borderBottom: '1px solid var(--color-border)', background: 'transparent',
+                                    fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+                                    color: 'var(--color-fg)', outline: 'none', width: 160,
+                                  }}
+                                />
+                                <button onClick={() => handleConfirmRename(accountId)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-primary)', padding: 0 }}>✓</button>
+                                <button onClick={() => setEditingCardId(null)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-muted-text)', padding: 0 }}>✕</button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-base font-bold truncate" style={{ color: 'var(--color-fg)' }}>{cardName}</span>
+                                {isHovered && (
+                                  <>
+                                    <button
+                                      onClick={() => { setEditingCardId(accountId); setEditCardName(cardName) }}
+                                      title="Rename"
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--color-muted-text)', padding: 0, lineHeight: 1, flexShrink: 0 }}>
+                                      ✎
+                                    </button>
+                                    <button
+                                      onClick={() => handleHideCard(accountId)}
+                                      title="Hide"
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--color-muted-text)', padding: '0 0 0 2px', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
+                                      Hide
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
                           </div>
-                          <span className="text-base font-semibold tabular-nums" style={{ color: 'var(--color-fg)' }}>
-                            ${amt.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
-                          </span>
+                          {!isEditingThis && (
+                            <span className="text-base font-semibold tabular-nums shrink-0" style={{ color: 'var(--color-fg)' }}>
+                              ${amt.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
+                            </span>
+                          )}
                         </div>
                       )
                     })}
+                    {hiddenAccounts.size > 0 && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() => setShowHiddenPanel(s => !s)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif", padding: 0, textDecoration: 'underline' }}>
+                          Manage hidden cards ({hiddenAccounts.size})
+                        </button>
+                        {showHiddenPanel && (
+                          <div className="mt-1.5 space-y-1">
+                            {[...hiddenAccounts].map(accountId => (
+                              <div key={accountId} className="flex items-center justify-between gap-2">
+                                <span style={{ fontSize: 12, color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+                                  {cardNameMap[accountId] ?? 'Hidden card'}
+                                </span>
+                                <button
+                                  onClick={() => handleShowCard(accountId)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif", padding: 0 }}>
+                                  Show
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="w-full h-px my-4" style={{ backgroundColor: 'var(--color-border)' }} />

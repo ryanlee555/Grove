@@ -67,6 +67,32 @@ Deno.serve(async (req) => {
     const allAccounts: any[] = []
 
     for (const tokenRow of tokenRows) {
+      // Fetch accounts via dedicated endpoint (more reliable than transactions/get)
+      const accountsRes = await fetch("https://production.plaid.com/accounts/get", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: Deno.env.get("PLAID_CLIENT_ID"),
+          secret: Deno.env.get("PLAID_PRODUCTION_SECRET"),
+          access_token: tokenRow.access_token,
+        }),
+      })
+      if (accountsRes.ok) {
+        const accountsJson = await accountsRes.json()
+        ;(accountsJson.accounts ?? []).forEach((a: any) => {
+          allAccounts.push({
+            account_id:    a.account_id,
+            name:          a.name,
+            official_name: a.official_name ?? null,
+            mask:          a.mask ?? null,
+            type:          a.type,
+            subtype:       a.subtype,
+          })
+        })
+      } else {
+        console.error(`accounts/get error for ${tokenRow.institution_name}:`, await accountsRes.text())
+      }
+
       // Paginate through all transactions
       let allBankTransactions: any[] = []
       let offset = 0
@@ -91,18 +117,6 @@ Deno.serve(async (req) => {
         if (!plaidRes.ok) {
           console.error(`Plaid error for ${tokenRow.institution_name}:`, plaidData)
           break
-        }
-
-        // Capture accounts on first page (same for all pages of same token)
-        if (offset === 0 && plaidData.accounts) {
-          allAccounts.push(...plaidData.accounts.map((a: any) => ({
-            account_id:    a.account_id,
-            name:          a.name,
-            official_name: a.official_name ?? null,
-            mask:          a.mask ?? null,
-            type:          a.type,
-            subtype:       a.subtype,
-          })))
         }
 
         allBankTransactions.push(...plaidData.transactions)

@@ -549,6 +549,7 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
   const [hoveredCat,   setHoveredCat]   = useState(null)
   const [lockedCat,    setLockedCat]    = useState(null)
   const [openPopover,  setOpenPopover]  = useState(null) // { name, x, y }
+  const [hoveredBadge, setHoveredBadge] = useState(null) // { name, x, y }
   const activeCat = lockedCat ?? hoveredCat
 
   // Click outside the section → deselect locked
@@ -641,16 +642,26 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
           </PieChart>
         </ResponsiveContainer>
 
-        {/* Hover label — shown only when hovering (not locked) */}
+        {/* Center label — total spent by default, active category when hovering */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          {hoveredCat && !lockedCat && activeCatData && (
+          {hoveredCat && !lockedCat && activeCatData ? (
             <div className="text-center px-3 max-w-[120px]">
               <p className="text-[10px] font-bold uppercase tracking-widest mb-1 truncate"
-                style={{ color: COLORS[activeCatData.name] }}>
+                style={{ color: COLORS[activeCatData.name], fontFamily: "'DM Sans', sans-serif" }}>
                 {activeCatData.name}
               </p>
               <p className="text-[17px] font-bold tabular-nums leading-none" style={{ color: 'var(--color-fg)' }}>
                 ${activeCatData.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          ) : !lockedCat && (
+            <div className="text-center px-3 max-w-[120px]">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1"
+                style={{ color: 'var(--color-muted-text)' }}>
+                Total
+              </p>
+              <p className="text-[17px] font-bold tabular-nums leading-none" style={{ color: 'var(--color-fg)' }}>
+                ${totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           )}
@@ -667,7 +678,7 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
               <div className="flex items-start justify-between mb-2 shrink-0">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-widest truncate"
-                    style={{ color: COLORS[lockedCat] }}>
+                    style={{ color: COLORS[lockedCat], fontFamily: "'DM Sans', sans-serif" }}>
                     {lockedCat}
                   </p>
                   <p className="text-[15px] font-bold tabular-nums leading-tight" style={{ color: 'var(--color-fg)' }}>
@@ -732,7 +743,7 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
               <div className="min-w-0 flex-1">
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <p className="text-[11px] truncate transition-all duration-150"
-                    style={{ fontWeight: isActive ? 700 : 500, color: 'var(--color-fg)', margin: 0 }}>
+                    style={{ fontWeight: isActive ? 700 : 500, color: 'var(--color-fg)', margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
                     {name}
                   </p>
                   {isOver && (
@@ -743,6 +754,11 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
                           const rect = e.currentTarget.getBoundingClientRect()
                           setOpenPopover(p => p?.name === name ? null : { name, x: rect.left, y: rect.top + rect.height / 2 })
                         }}
+                        onMouseEnter={e => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setHoveredBadge({ name, x: rect.left, y: rect.top + rect.height / 2 })
+                        }}
+                        onMouseLeave={() => setHoveredBadge(null)}
                         style={{
                           width: 16, height: 16, borderRadius: '50%',
                           backgroundColor: 'hsl(0, 65%, 50%)', color: '#fff',
@@ -783,7 +799,7 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 13, color: 'var(--color-fg)', margin: '0 0 8px' }}>
+            <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--color-fg)', margin: '0 0 8px' }}>
               {openPopover.name}
             </p>
             <p style={{ fontSize: 12, color: 'var(--color-muted-text)', margin: '0 0 4px' }}>
@@ -807,6 +823,46 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
             </button>
           </div>
         )}
+
+        {/* Hover popover on ! badge */}
+        {hoveredBadge && (() => {
+          const catData = byCategory.find(e => e.name === hoveredBadge.name)
+          const limit   = budgetLimits[hoveredBadge.name] ?? 0
+          const spent   = catData?.value ?? 0
+          const overBy  = spent - limit
+          return (
+            <div
+              style={{
+                position: 'fixed',
+                right: window.innerWidth - hoveredBadge.x + 8,
+                top: hoveredBadge.y,
+                transform: 'translateY(-50%)',
+                zIndex: 101,
+                minWidth: 160,
+                backgroundColor: 'var(--color-bg-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 12,
+                padding: 14,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                fontFamily: "'DM Sans', sans-serif",
+                pointerEvents: 'none',
+              }}
+            >
+              <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--color-fg)', margin: '0 0 8px' }}>
+                {hoveredBadge.name}
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--color-muted-text)', margin: '0 0 4px' }}>
+                Limit: <span style={{ color: 'var(--color-fg)', fontWeight: 600 }}>${limit.toFixed(2)}</span>
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--color-muted-text)', margin: '0 0 4px' }}>
+                Spent: <span style={{ color: 'var(--color-fg)', fontWeight: 600 }}>${spent.toFixed(2)}</span>
+              </p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'hsl(0, 60%, 48%)', margin: 0 }}>
+                Over by: ${overBy.toFixed(2)}
+              </p>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
@@ -1517,15 +1573,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                       const isHovered = hoveredCardId === accountId
                       return (
                         <div key={accountId}
-                          draggable={!isHidden}
-                          onDragStart={!isHidden ? (e) => {
-                            e.dataTransfer.setData('text/plain', accountId)
-                            e.currentTarget.style.opacity = '0.4'
-                          } : undefined}
-                          onDragEnd={!isHidden ? (e) => {
-                            e.currentTarget.style.opacity = '1'
-                            setDragOver(null)
-                          } : undefined}
+                          data-acct-row=""
                           onDragOver={!isHidden ? (e) => {
                             e.preventDefault()
                             setDragOver(accountId)
@@ -1546,7 +1594,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                             const hidden = accountOrder.filter(id => accountSettings[id]?.hidden ?? false)
                             handleReorder([...reordered, ...hidden])
                           } : undefined}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, opacity: isHidden ? 0.4 : 1, transition: 'opacity 0.15s', cursor: isHidden ? 'default' : 'grab', outline: dragOver === accountId ? '2px solid hsl(145,38%,34%)' : 'none', borderRadius: 8 }}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, opacity: isHidden ? 0.4 : 1, transition: 'opacity 0.15s', outline: dragOver === accountId ? '2px solid hsl(145,38%,34%)' : 'none', borderRadius: 8 }}
                           onMouseEnter={() => setHoveredCardId(accountId)}
                           onMouseLeave={() => setHoveredCardId(null)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
@@ -1575,7 +1623,17 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                               </>
                             ) : (
                               <>
-                                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-fg)', fontFamily: "'DM Sans', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isHidden ? 'line-through' : 'none' }}>
+                                <span
+                                  draggable={!isHidden}
+                                  onDragStart={!isHidden ? (e) => {
+                                    e.dataTransfer.setData('text/plain', accountId)
+                                    e.currentTarget.closest('[data-acct-row]').style.opacity = '0.4'
+                                  } : undefined}
+                                  onDragEnd={!isHidden ? (e) => {
+                                    e.currentTarget.closest('[data-acct-row]').style.opacity = isHidden ? '0.4' : '1'
+                                    setDragOver(null)
+                                  } : undefined}
+                                  style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-fg)', fontFamily: "'DM Sans', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isHidden ? 'line-through' : 'none', cursor: isHidden ? 'default' : 'grab' }}>
                                   {displayName}
                                 </span>
                                 {isHovered && (

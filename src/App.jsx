@@ -1248,19 +1248,37 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
   // ── Card settings handlers ────────────────────────────────────────────────────
   async function handleConfirmRename(accountId) {
-    const newName = editCardName.trim() || cardNameMap[accountId]
+    const trimmed = editCardName.trim()
     setEditingCardId(null)
     const oldName = cardNameMap[accountId]
     const color = cardColorMap[oldName] ?? CARD_PALETTE[0]
-    setCardNameMap(prev => ({ ...prev, [accountId]: newName }))
-    setCardColorMap(prev => { const n = { ...prev }; delete n[oldName]; n[newName] = color; return n })
-    setAccountDisplayNames(prev => ({ ...prev, [accountId]: newName }))
-    setAllTx(prev => prev.map(t => t.account_id === accountId ? { ...t, source: newName } : t))
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('account_settings').upsert(
-      { user_id: user.id, account_id: accountId, display_name: newName },
-      { onConflict: 'user_id,account_id' }
-    )
+
+    if (!trimmed) {
+      // Empty → reset to Plaid default name
+      const acct = accounts.find(a => a.account_id === accountId)
+      const plaidName = acct
+        ? ((acct.official_name?.trim() || acct.name || '') + (acct.mask ? ` ••${acct.mask}` : '')) || `Card ••${acct.mask ?? '????'}`
+        : oldName
+      setCardNameMap(prev => ({ ...prev, [accountId]: plaidName }))
+      setCardColorMap(prev => { const n = { ...prev }; delete n[oldName]; n[plaidName] = color; return n })
+      setAccountDisplayNames(prev => { const n = { ...prev }; delete n[accountId]; return n })
+      setAllTx(prev => prev.map(t => t.account_id === accountId ? { ...t, source: plaidName } : t))
+      await supabase.from('account_settings').upsert(
+        { user_id: user.id, account_id: accountId, display_name: null },
+        { onConflict: 'user_id,account_id' }
+      )
+    } else {
+      // Non-empty → rename
+      setCardNameMap(prev => ({ ...prev, [accountId]: trimmed }))
+      setCardColorMap(prev => { const n = { ...prev }; delete n[oldName]; n[trimmed] = color; return n })
+      setAccountDisplayNames(prev => ({ ...prev, [accountId]: trimmed }))
+      setAllTx(prev => prev.map(t => t.account_id === accountId ? { ...t, source: trimmed } : t))
+      await supabase.from('account_settings').upsert(
+        { user_id: user.id, account_id: accountId, display_name: trimmed },
+        { onConflict: 'user_id,account_id' }
+      )
+    }
   }
 
   async function handleHideCard(accountId) {
@@ -1437,22 +1455,45 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                 </button>
               }
             >
-              <div className="flex flex-col h-full justify-between">
-                <div>
-                  <button ref={dateBtnRef} onClick={openDatePicker}
-                    className="flex items-center gap-1 mb-2 text-[11px] font-medium transition-colors"
-                    style={{ color: 'var(--color-muted-text)' }}>
-                    {formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)}
-                    <ChevronDown size={11} className={`transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
-                  </button>
-                  <p className="text-5xl font-bold tracking-tight tabular-nums leading-none" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
-                    ${totalSpent.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
-                  </p>
-                  <div className="mt-3 space-y-1">
-                    <p className="text-[11px] uppercase tracking-wide mb-2"
-                      style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
-                      Credit / Debit Cards:
+              <div className="flex flex-col h-full">
+                {/* Row: date toggle left | big amount + stats right */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <button ref={dateBtnRef} onClick={openDatePicker}
+                      className="flex items-center gap-1 text-[11px] font-medium transition-colors"
+                      style={{ color: 'var(--color-muted-text)', marginBottom: 4 }}>
+                      {formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)}
+                      <ChevronDown size={11} className={`transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
+                    </button>
+                    <p className="text-5xl font-bold tracking-tight tabular-nums leading-none" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>
+                      ${totalSpent.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
                     </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif", textTransform: 'uppercase', marginBottom: 6 }}>Daily Avg</span>
+                      <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Playfair Display', serif", color: 'var(--color-fg)' }}>${dailyAvg.toFixed(2)}</span>
+                      <div style={{ height: 18 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif", textTransform: 'uppercase', marginBottom: 6 }}>Transactions</span>
+                      <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Playfair Display', serif", color: 'var(--color-fg)' }}>{purchaseCount}</span>
+                      <div style={{ height: 18 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--color-primary)', fontFamily: "'DM Sans', sans-serif", textTransform: 'uppercase', marginBottom: 6 }}>Top Category</span>
+                      <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Playfair Display', serif", color: 'var(--color-fg)' }}>{topCategory}</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>${topCatAmt.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-full h-px mb-3" style={{ backgroundColor: 'var(--color-border)' }} />
+                <div className="flex-1 min-h-0">
+                  <p className="text-[11px] uppercase tracking-wide mb-2"
+                    style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
+                    Banks &amp; Credit / Debit Cards:
+                  </p>
+                  <div className="space-y-1" style={{ maxHeight: 160, overflowY: 'auto' }}>
                     {(Object.keys(cardNameMap).length > 0
                       ? Object.entries(cardNameMap)
                       : accounts.map((a, i) => [a.account_id, (a.official_name?.trim() || a.name || '') + (a.mask ? ` ••${a.mask}` : `Card ${i + 1}`)])
@@ -1546,24 +1587,8 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                         )}
                       </div>
                     )}
-                  </div>
-                </div>
-                <div className="w-full h-px my-4" style={{ backgroundColor: 'var(--color-border)' }} />
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--color-muted-text)' }}>Daily Avg</p>
-                    <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-fg)' }}>${dailyAvg.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--color-muted-text)' }}>Transactions</p>
-                    <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-fg)' }}>{purchaseCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--color-muted-text)' }}>Top Category</p>
-                    <p className="text-sm font-bold truncate" style={{ color: COLORS[topCategory] ?? 'hsl(140, 16%, 68%)' }}>{topCategory}</p>
-                    <p className="text-[11px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>${topCatAmt.toFixed(2)}</p>
-                  </div>
-                </div>
+                    </div>{/* end scrollable */}
+                  </div>{/* end flex-1 */}
               </div>
             </Card>
 

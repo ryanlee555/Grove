@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
 
     // Fetch transactions from each bank and combine
     const allTransactions = []
+    const allAccounts: any[] = []
 
     for (const tokenRow of tokenRows) {
       // Paginate through all transactions
@@ -92,6 +93,18 @@ Deno.serve(async (req) => {
           break
         }
 
+        // Capture accounts on first page (same for all pages of same token)
+        if (offset === 0 && plaidData.accounts) {
+          allAccounts.push(...plaidData.accounts.map((a: any) => ({
+            account_id:    a.account_id,
+            name:          a.name,
+            official_name: a.official_name ?? null,
+            mask:          a.mask ?? null,
+            type:          a.type,
+            subtype:       a.subtype,
+          })))
+        }
+
         allBankTransactions.push(...plaidData.transactions)
 
         if (allBankTransactions.length >= plaidData.total_transactions) break
@@ -106,10 +119,18 @@ Deno.serve(async (req) => {
       allTransactions.push(...tagged)
     }
 
+    // Deduplicate accounts by account_id across tokens
+    const seenAccountIds = new Set<string>()
+    const dedupedAccounts = allAccounts.filter(a => {
+      if (seenAccountIds.has(a.account_id)) return false
+      seenAccountIds.add(a.account_id)
+      return true
+    })
+
     // Sort combined transactions by date descending
     allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-    return new Response(JSON.stringify({ transactions: allTransactions }), {
+    return new Response(JSON.stringify({ transactions: allTransactions, accounts: dedupedAccounts }), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     })
   } catch (err) {

@@ -800,11 +800,17 @@ function BudgetShowcaseCard({ category, spent, initialLimit, dotColor, delay = 0
             Remove limit
           </button>
         ) : (
-          <button
+          <span
             onClick={() => setIsEditing(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif", padding: 0 }}>
-            Edit
-          </button>
+            style={{
+              fontSize: 13,
+              cursor: 'pointer',
+              color: limit == null ? 'var(--color-primary)' : 'var(--color-muted-text)',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {limit == null ? 'Set limit' : 'Edit'}
+          </span>
         )}
       </div>
 

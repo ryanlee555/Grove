@@ -26,11 +26,16 @@ const COLORS = {
   'Bills & Utilities': '#7A9E5F',
   'Miscellaneous':     '#48A111',
 }
-const CARD_COLORS = {
-  'Chase Flex':      'hsl(140, 16%, 68%)',
-  'Chase Unlimited': 'hsl(145, 38%, 34%)',
-  'Other':           'hsl(25, 55%, 52%)',
-}
+const CARD_PALETTE = [
+  '#0D530E',
+  '#306D29',
+  '#546B41',
+  '#4C5C2D',
+  '#99AD7A',
+  '#A5CF83',
+  '#6FCF97',
+  '#2E7D4F',
+]
 const CATEGORIES   = Object.keys(COLORS)
 const CARD_OPTIONS = ['Chase Unlimited', 'Chase Flex', 'Other']
 
@@ -808,7 +813,7 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
 }
 
 // ─── Spending by Card section (Q2 alternate) ──────────────────────────────────
-function CardSection({ byCard, totalSpent, transactions }) {
+function CardSection({ byCard, totalSpent, transactions, cardColorMap = {} }) {
   const [hoveredCard, setHoveredCard] = useState(null)
   const [lockedCard,  setLockedCard]  = useState(null)
   const activeCard = lockedCard ?? hoveredCard
@@ -868,7 +873,7 @@ function CardSection({ byCard, totalSpent, transactions }) {
               {byCard.map(e => (
                 <Cell
                   key={e.name}
-                  fill={CARD_COLORS[e.name] ?? 'hsl(140, 16%, 68%)'}
+                  fill={cardColorMap[e.name] ?? 'hsl(140, 16%, 68%)'}
                   opacity={activeCard && e.name !== activeCard ? 0.3 : 1}
                   style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
                 />
@@ -882,7 +887,7 @@ function CardSection({ byCard, totalSpent, transactions }) {
           {hoveredCard && !lockedCard && activeCardData && (
             <div className="text-center px-3 max-w-[120px]">
               <p className="text-[10px] font-bold uppercase tracking-widest mb-1 truncate"
-                style={{ color: CARD_COLORS[activeCardData.name] }}>
+                style={{ color: cardColorMap[activeCardData.name] }}>
                 {activeCardData.name}
               </p>
               <p className="text-[17px] font-bold tabular-nums leading-none" style={{ color: 'var(--color-fg)' }}>
@@ -902,7 +907,7 @@ function CardSection({ byCard, totalSpent, transactions }) {
               <div className="flex items-start justify-between mb-2 shrink-0">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-widest truncate"
-                    style={{ color: CARD_COLORS[lockedCard] }}>
+                    style={{ color: cardColorMap[lockedCard] }}>
                     {lockedCard}
                   </p>
                   <p className="text-[15px] font-bold tabular-nums leading-tight" style={{ color: 'var(--color-fg)' }}>
@@ -957,7 +962,7 @@ function CardSection({ byCard, totalSpent, transactions }) {
               onClick={() => { setLockedCard(l => l === name ? null : name); setHoveredCard(null) }}
             >
               <span className="w-2 h-2 rounded-full shrink-0 transition-transform duration-150"
-                style={{ backgroundColor: CARD_COLORS[name] ?? 'hsl(140, 16%, 68%)',
+                style={{ backgroundColor: cardColorMap[name] ?? 'hsl(140, 16%, 68%)',
                          transform: isActive ? 'scale(1.4)' : 'scale(1)' }} />
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] truncate transition-all duration-150"
@@ -1008,11 +1013,13 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const [formAmount,   setFormAmount]   = useState('')
 
   // Unified transaction store (Plaid + manual), each tx has a stable id
-  const [allTx,       setAllTx]       = useState([])
-  const [accounts,    setAccounts]    = useState([])
-  const [txLoading,   setTxLoading]   = useState(true)
-  const [txError,     setTxError]     = useState('')
-  const [dashBudgets, setDashBudgets] = useState({})
+  const [allTx,        setAllTx]        = useState([])
+  const [accounts,     setAccounts]     = useState([])
+  const [cardNameMap,  setCardNameMap]  = useState({})  // account_id -> display name
+  const [cardColorMap, setCardColorMap] = useState({})  // display name -> color
+  const [txLoading,    setTxLoading]    = useState(true)
+  const [txError,      setTxError]      = useState('')
+  const [dashBudgets,  setDashBudgets]  = useState({})
 
   useEffect(() => {
     async function loadTransactions() {
@@ -1035,6 +1042,18 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         return
       }
 
+      // Build card name/color maps from accounts data
+      const accountsData = data.accounts ?? []
+      const localNameMap = {}
+      const localColorMap = {}
+      accountsData.forEach((a, i) => {
+        const displayName = (a.official_name || a.name) + (a.mask ? ` ••${a.mask}` : '')
+        localNameMap[a.account_id] = displayName
+        localColorMap[displayName] = CARD_PALETTE[i % CARD_PALETTE.length]
+      })
+      setCardNameMap(localNameMap)
+      setCardColorMap(localColorMap)
+
       const mapped = data.transactions
         .filter(t => {
           const primary = t.personal_finance_category?.primary ?? ''
@@ -1053,9 +1072,8 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
           })(),
           category:         plaidCategoryToGrove(t.personal_finance_category?.detailed ?? '', t.merchant_name || t.name),
           amount:           -t.amount, // Plaid positive = debit, negative = credit
-          source: t.account_id === 'xMZQeOL4EVH1ZERR5AOJcPZr4DdVxKcJnXOBR' ? 'Chase Flex'
-                  : t.account_id === 'aEQgpwa9oyCMRj88vNx7SQLjOpyZ39I9EB7rP' ? 'Chase Unlimited'
-                  : 'Other',
+          account_id:       t.account_id,
+          source:           localNameMap[t.account_id] ?? t.account_id,
           institution_name: t.institution_name ?? null,
         }))
 
@@ -1364,17 +1382,15 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                       style={{ color: 'var(--color-muted-text)', fontFamily: "'DM Sans', sans-serif" }}>
                       Credit / Debit Cards:
                     </p>
-                    {[
-                      { label: 'Chase Freedom Flex',      color: 'hsl(140, 16%, 68%)', source: 'Chase Flex'      },
-                      { label: 'Chase Freedom Unlimited', color: 'hsl(145, 38%, 34%)', source: 'Chase Unlimited' },
-                    ].map(({ label, color, source }) => {
-                      const amt = transactions.filter(t => t.source === source && t.amount < 0)
+                    {Object.entries(cardNameMap).map(([accountId, cardName]) => {
+                      const color = cardColorMap[cardName] ?? 'hsl(140, 16%, 68%)'
+                      const amt = transactions.filter(t => t.account_id === accountId && t.amount < 0)
                         .reduce((s, t) => s + Math.abs(t.amount), 0)
                       return (
-                        <div key={source} className="flex items-center justify-between gap-2">
+                        <div key={accountId} className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                            <span className="text-base font-bold" style={{ color: 'var(--color-fg)' }}>{label}</span>
+                            <span className="text-base font-bold" style={{ color: 'var(--color-fg)' }}>{cardName}</span>
                           </div>
                           <span className="text-base font-semibold tabular-nums" style={{ color: 'var(--color-fg)' }}>
                             ${amt.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
@@ -1432,6 +1448,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                   byCard={byCard}
                   totalSpent={totalSpent}
                   transactions={transactions}
+                  cardColorMap={cardColorMap}
                 />
               )}
             </Card>
@@ -1472,8 +1489,6 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                   </thead>
                   <tbody>
                     {sortedTx.map((t) => {
-                      const isUnlimited = t.source === 'Chase Unlimited'
-                      const isFlex      = t.source === 'Chase Flex'
                       const isExpanded  = expandedRow === t.id
                       return (
                         <Fragment key={t.id}>
@@ -1497,14 +1512,15 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
                               </span>
                             </td>
                             <td className="py-2 pr-3">
-                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
-                                style={isUnlimited
-                                  ? { backgroundColor: 'hsl(145, 38%, 90%)', color: 'hsl(145, 38%, 28%)' }
-                                  : isFlex
-                                  ? { backgroundColor: 'hsl(140, 16%, 88%)', color: 'hsl(140, 16%, 38%)' }
-                                  : { backgroundColor: 'var(--color-muted-bg)', color: 'var(--color-muted-text)' }}>
-                                {isUnlimited ? 'Unlimited' : isFlex ? 'Flex' : t.source}
-                              </span>
+                              {(() => {
+                                const c = cardColorMap[t.source] ?? 'hsl(140, 16%, 68%)'
+                                return (
+                                  <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                    style={{ backgroundColor: c + '28', color: c }}>
+                                    {t.source}
+                                  </span>
+                                )
+                              })()}
                             </td>
                             <td className={`py-2 text-right text-[12px] font-semibold tabular-nums ${t.amount < 0 ? 'text-red-600' : ''}`}
                               style={t.amount >= 0 ? { color: 'var(--color-primary)' } : {}}>

@@ -13,18 +13,18 @@ const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS = {
-  'Zelle':             'hsl(214, 70%, 50%)',
-  'Venmo':             'hsl(217, 89%, 40%)',
-  'Food & Dining':     'hsl(145, 38%, 34%)',
-  'Groceries':         'hsl(140, 22%, 52%)',
-  'Events':            'hsl(42, 68%, 58%)',
-  'Subscriptions':     'hsl(200, 30%, 52%)',
-  'Transport':         'hsl(25, 55%, 52%)',
-  'Shopping':          'hsl(340, 30%, 55%)',
-  'Bills & Utilities': 'hsl(150, 22%, 14%)',
-  'Travel':            'hsl(42, 45%, 72%)',
-  'Nightlife':         'hsl(270, 20%, 52%)',
-  'Miscellaneous':     'hsl(140, 16%, 68%)',
+  'Food & Dining':     '#0D530E',
+  'Events':            '#546B41',
+  'Shopping':          '#4C5C2D',
+  'Groceries':         '#306D29',
+  'Subscriptions':     '#99AD7A',
+  'Transport':         '#A5CF83',
+  'Zelle':             '#6FCF97',
+  'Venmo':             '#DCCCAC',
+  'Nightlife':         '#2E7D4F',
+  'Travel':            '#B8C99A',
+  'Bills & Utilities': '#7A9E5F',
+  'Miscellaneous':     '#48A111',
 }
 const CARD_COLORS = {
   'Chase Flex':      'hsl(140, 16%, 68%)',

@@ -754,10 +754,9 @@ function BudgetShowcaseCard({ category, spent, initialLimit, dotColor, delay = 0
   const [isEditing, setIsEditing] = useState(false)
 
   const hasLimit = limit !== null
-  const pct      = hasLimit ? Math.min(spent / limit, 1) : 0
+  const pct      = hasLimit && limit > 0 ? spent / limit : 0
   const isOver   = hasLimit && spent > limit
-  const isWarn   = hasLimit && !isOver && pct > 0.8
-  const barColor = isOver ? 'hsl(0,65%,50%)' : isWarn ? 'hsl(42,68%,58%)' : 'hsl(145,38%,34%)'
+  const barColor = isOver ? 'hsl(0, 60%, 52%)' : pct > 0.8 ? 'hsl(42, 68%, 58%)' : dotColor
   const diff     = hasLimit ? Math.abs(limit - spent) : 0
 
   return (
@@ -851,10 +850,10 @@ function BudgetShowcaseCard({ category, spent, initialLimit, dotColor, delay = 0
 
 // ─── Budgets feature section ──────────────────────────────────────────────────
 const BUDGET_SHOWCASE = [
-  { category: 'Food & Dining', spent: 312, initialLimit: 350, dotColor: 'hsl(145,38%,34%)' },
-  { category: 'Shopping',      spent: 178, initialLimit: 150, dotColor: 'hsl(340,30%,55%)' },
-  { category: 'Transport',     spent: 54,  initialLimit: 120, dotColor: 'hsl(25,55%,52%)'  },
-  { category: 'Entertainment', spent: 89,  initialLimit: 100, dotColor: 'hsl(42,68%,58%)'  },
+  { category: 'Food & Dining', spent: 312, initialLimit: 350, dotColor: '#0D530E' },
+  { category: 'Shopping',      spent: 178, initialLimit: 150, dotColor: '#4C5C2D' },
+  { category: 'Transport',     spent: 54,  initialLimit: 120, dotColor: '#A5CF83' },
+  { category: 'Entertainment', spent: 89,  initialLimit: 100, dotColor: '#546B41' },
 ]
 
 function BudgetsFeatureSection() {

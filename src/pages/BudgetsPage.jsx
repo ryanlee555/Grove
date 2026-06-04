@@ -8,18 +8,18 @@ import ArcSlider from '../components/ArcSlider'
 const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
 const COLORS = {
-  'Zelle':             'hsl(214, 70%, 50%)',
-  'Venmo':             'hsl(217, 89%, 40%)',
-  'Food & Dining':     'hsl(145, 38%, 34%)',
-  'Groceries':         'hsl(140, 22%, 52%)',
-  'Events':            'hsl(42, 68%, 58%)',
-  'Subscriptions':     'hsl(200, 30%, 52%)',
-  'Transport':         'hsl(25, 55%, 52%)',
-  'Shopping':          'hsl(340, 30%, 55%)',
-  'Bills & Utilities': 'hsl(150, 22%, 14%)',
-  'Travel':            'hsl(42, 45%, 72%)',
-  'Nightlife':         'hsl(270, 20%, 52%)',
-  'Miscellaneous':     'hsl(140, 16%, 68%)',
+  'Food & Dining':     '#0D530E',
+  'Events':            '#546B41',
+  'Shopping':          '#4C5C2D',
+  'Groceries':         '#306D29',
+  'Subscriptions':     '#99AD7A',
+  'Transport':         '#A5CF83',
+  'Zelle':             '#6FCF97',
+  'Venmo':             '#DCCCAC',
+  'Nightlife':         '#2E7D4F',
+  'Travel':            '#B8C99A',
+  'Bills & Utilities': '#7A9E5F',
+  'Miscellaneous':     '#48A111',
 }
 
 const CATEGORIES = Object.keys(COLORS)
@@ -675,6 +675,7 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
   const over     = hasLimit && spent > limit
   const pct      = hasLimit ? Math.min(spent / limit, 1) : 0
   const diff     = hasLimit ? Math.abs(limit - spent) : 0
+  const barColor = over ? 'hsl(0, 60%, 52%)' : pct > 0.8 ? 'hsl(42, 68%, 58%)' : color
 
   return (
     <div style={{
@@ -732,7 +733,7 @@ function BudgetCard({ category, color, spent, limit, editValue, isSaving, highli
               <div style={{ height: 6, borderRadius: 4, backgroundColor: 'var(--color-muted-bg)', overflow: 'hidden', marginBottom: 10 }}>
                 <div style={{
                   height: '100%', width: `${pct * 100}%`, borderRadius: 4,
-                  backgroundColor: over ? 'hsl(0, 60%, 52%)' : color,
+                  backgroundColor: barColor,
                   transition: 'width 0.4s ease',
                 }} />
               </div>

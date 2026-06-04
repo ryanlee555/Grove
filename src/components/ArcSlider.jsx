@@ -1,15 +1,18 @@
 import { useState, useRef } from 'react'
 
 const GRADIENTS = {
-  'Food & Dining':  { id: 'grad-food',         start: '#2d6a4f', end: '#d4a843' },
-  'Transport':      { id: 'grad-transport',     start: '#c45e1a', end: '#e8a838' },
-  'Shopping':       { id: 'grad-shopping',      start: '#9b3d8f', end: '#d4a843' },
-  'Events':         { id: 'grad-events',        start: '#1a6ec4', end: '#5bb8d4' },
-  'Subscriptions':  { id: 'grad-subscriptions', start: '#1a6ec4', end: '#9b3d8f' },
-  'Travel':         { id: 'grad-travel',        start: '#1a6ec4', end: '#9b3d8f' },
-  'Groceries':      { id: 'grad-groceries',     start: '#3d8f3d', end: '#d4a843' },
-  'Nightlife':      { id: 'grad-nightlife',     start: '#6b3d8f', end: '#d4a843' },
-  'Miscellaneous':  { id: 'grad-misc',          start: '#888780', end: '#d4a843' },
+  'Food & Dining':     { id: 'grad-food',         start: '#0D530E', end: '#306D29' },
+  'Transport':         { id: 'grad-transport',     start: '#A5CF83', end: '#6FCF97' },
+  'Shopping':          { id: 'grad-shopping',      start: '#4C5C2D', end: '#99AD7A' },
+  'Events':            { id: 'grad-events',        start: '#546B41', end: '#99AD7A' },
+  'Subscriptions':     { id: 'grad-subscriptions', start: '#99AD7A', end: '#DCCCAC' },
+  'Travel':            { id: 'grad-travel',        start: '#B8C99A', end: '#DCCCAC' },
+  'Groceries':         { id: 'grad-groceries',     start: '#306D29', end: '#48A111' },
+  'Nightlife':         { id: 'grad-nightlife',     start: '#2E7D4F', end: '#4C5C2D' },
+  'Miscellaneous':     { id: 'grad-misc',          start: '#48A111', end: '#99AD7A' },
+  'Zelle':             { id: 'grad-zelle',         start: '#6FCF97', end: '#A5CF83' },
+  'Venmo':             { id: 'grad-venmo',         start: '#DCCCAC', end: '#99AD7A' },
+  'Bills & Utilities': { id: 'grad-bills',         start: '#7A9E5F', end: '#0D530E' },
 }
 
 const CX = 116, CY = 115, R = 100

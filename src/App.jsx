@@ -411,9 +411,15 @@ function TrendsSection({ allTx, selectedPeriod, rangeDays }) {
   const removeComparison = (id) => setCompareRanges(prev => prev.filter(r => r.id !== id))
 
   const addMonth = (id) => {
+    if (!id) return
     const m = availableMonths.find(x => x.id === id)
     if (!m) return
-    addComparison(m.start, m.end, m.label)
+    const compId = `${m.start.getTime()}-${m.end.getTime()}`
+    if (compareRanges.find(r => r.id === compId)) {
+      removeComparison(compId)
+    } else {
+      addComparison(m.start, m.end, m.label)
+    }
     setCompMonthId('')
   }
 
@@ -453,13 +459,14 @@ function TrendsSection({ allTx, selectedPeriod, rangeDays }) {
               <select
                 value={compMonthId}
                 onChange={e => addMonth(e.target.value)}
-                disabled={compareRanges.length >= 4}
-                className="px-2 py-1 rounded-md border text-[10px] outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2 py-1 rounded-md border text-[10px] outline-none cursor-pointer transition-colors"
                 style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)' }}>
                 <option value="">Add month…</option>
-                {availableMonths
-                  .filter(m => !compareRanges.find(r => r.id === m.id))
-                  .map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                {availableMonths.map(m => {
+                  const compId = `${m.start.getTime()}-${m.end.getTime()}`
+                  const isActive = !!compareRanges.find(r => r.id === compId)
+                  return <option key={m.id} value={m.id}>{isActive ? '✓ ' : ''}{m.label}</option>
+                })}
               </select>
             </div>
           )}

@@ -437,8 +437,8 @@ function TrendsSection({ allTx, selectedPeriod, rangeDays }) {
             <button key={v} onClick={() => setView(v)}
               className="px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-colors"
               style={view === v
-                ? { backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
-                : { color: 'var(--color-muted-text)' }}>
+                ? { backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)', cursor: 'pointer' }
+                : { color: 'var(--color-muted-text)', cursor: 'pointer' }}>
               {v === 'bar' ? 'Bar' : 'Line'}
             </button>
           ))}
@@ -1592,8 +1592,8 @@ Use all this data to answer questions accurately. If asked about a specific time
                     <p className="text-[11px]" style={{ color: 'var(--color-muted-text)' }}>Personal account</p>
                   </div>
                   <button className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
-                    style={{ color: 'var(--color-fg)' }}>Settings</button>
-                  <button onClick={handleSignOut} className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80">Sign out</button>
+                    style={{ color: 'var(--color-fg)', cursor: 'pointer' }}>Settings</button>
+                  <button onClick={handleSignOut} className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80" style={{ cursor: 'pointer' }}>Sign out</button>
                 </div>
               )}
             </div>
@@ -1624,7 +1624,7 @@ Use all this data to answer questions accurately. If asked about a specific time
               action={
                 <button onClick={() => setShowAddModal(true)}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors"
-                  style={{ color: 'var(--color-primary)' }}
+                  style={{ color: 'var(--color-primary)', cursor: 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                   <Plus size={11} /> Add
@@ -1637,7 +1637,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                   <div>
                     <button ref={dateBtnRef} onClick={openDatePicker}
                       className="flex items-center gap-1 text-[11px] font-medium transition-colors"
-                      style={{ color: 'var(--color-muted-text)', marginBottom: 4 }}>
+                      style={{ color: 'var(--color-muted-text)', marginBottom: 4, cursor: 'pointer' }}>
                       {formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)}
                       <ChevronDown size={11} className={`transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
                     </button>
@@ -1787,8 +1787,8 @@ Use all this data to answer questions accurately. If asked about a specific time
                     <button key={v} onClick={() => setCatCardView(v)}
                       className="px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-colors"
                       style={catCardView === v
-                        ? { backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }
-                        : { color: 'var(--color-muted-text)' }}>
+                        ? { backgroundColor: 'var(--color-bg-card)', color: 'var(--color-fg)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)', cursor: 'pointer' }
+                        : { color: 'var(--color-muted-text)', cursor: 'pointer' }}>
                       {v === 'category' ? 'Category' : 'Card'}
                     </button>
                   ))}

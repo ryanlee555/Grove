@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient'
 import LeafIcon from '../components/LeafIcon'
 import ArcSlider from '../components/ArcSlider'
 import HamiltonAI from '../components/HamiltonAI'
+import hamiltonIcon from '../assets/hamilton-icon.png'
 
 const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
@@ -469,7 +470,7 @@ Use this data to answer the user's questions about their budgets accurately.`
                 background: 'none', border: 'none', cursor: 'pointer', borderRadius: 12,
                 fontSize: 18, color: 'var(--color-muted-text)',
               }}>
-              💵
+              <img src={hamiltonIcon} alt="Hamilton AI" style={{ width: 24, height: 24 }} />
             </button>
             {showHamilton && (
               <div style={{

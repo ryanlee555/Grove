@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import hamiltonIcon from '../assets/hamilton-icon.png'
 
 const EDGE_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/hamilton-chat'
 
@@ -136,7 +137,7 @@ export default function HamiltonAI({ isOpen, onClose, userName, financialContext
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 18 }}>💵</span>
+              <img src={hamiltonIcon} alt="Hamilton AI" style={{ width: 20, height: 20 }} />
               <span style={{
                 fontFamily: 'Playfair Display, serif',
                 fontSize: 16,

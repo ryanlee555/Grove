@@ -9,6 +9,7 @@ import { ChevronDown, X, Plus } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import LeafIcon from './components/LeafIcon'
 import HamiltonAI from './components/HamiltonAI'
+import hamiltonIcon from './assets/hamilton-icon.png'
 
 const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
@@ -1494,7 +1495,9 @@ Use this data to answer the user's questions accurately.`
             <div className="relative group">
               <button className="w-9 h-9 flex items-center justify-center rounded-xl text-lg transition-colors"
                 style={{ color: 'var(--color-muted-text)' }}
-                onClick={() => setHamiltonOpen(true)}>💵</button>
+                onClick={() => setHamiltonOpen(true)}>
+                <img src={hamiltonIcon} alt="Hamilton AI" style={{ width: 24, height: 24 }} />
+              </button>
               <div className="pointer-events-none absolute right-0 top-full mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 border"
                 style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}>
                 Hamilton AI

@@ -1420,25 +1420,82 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const dailyAvg      = totalSpent / rangeDays
 
   const hamiltonContext = useMemo(() => {
-    const periodLabel = selectedPeriod.label ?? formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)
+    // Current period summary (what's on screen)
+    const periodLabel = selectedPeriod.label ?? 'current period'
     const catLines = byCategory.map(c => {
       const budget = dashBudgets[c.name]
       const over = budget != null && c.value > budget
       return `- ${c.name}: $${c.value.toFixed(2)}${budget != null ? ` (budget: $${budget}, ${over ? 'OVER by $' + (c.value - budget).toFixed(2) : 'under budget'})` : ''}`
     }).join('\n')
-    const overList = [...overBudgetCats].join(', ') || 'none'
-    return `The user's Grove finance dashboard data for ${periodLabel}:
+
+    // Build full history summary from allTx
+    const allSpending = allTx.filter(t => t.amount < 0)
+
+    // Monthly totals per category across all time
+    const monthlyMap = {}
+    allSpending.forEach(t => {
+      const [m, , y] = t.date.split('/')
+      const monthKey = `${y}-${m.padStart(2, '0')}`
+      if (!monthlyMap[monthKey]) monthlyMap[monthKey] = {}
+      if (!monthlyMap[monthKey][t.category]) monthlyMap[monthKey][t.category] = 0
+      monthlyMap[monthKey][t.category] += Math.abs(t.amount)
+    })
+
+    const monthlyLines = Object.entries(monthlyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, cats]) => {
+        const total = Object.values(cats).reduce((s, v) => s + v, 0)
+        const catBreakdown = Object.entries(cats)
+          .sort(([,a],[,b]) => b - a)
+          .map(([cat, amt]) => `    ${cat}: $${amt.toFixed(2)}`)
+          .join('\n')
+        return `${month} (total: $${total.toFixed(2)}):\n${catBreakdown}`
+      }).join('\n\n')
+
+    // All-time category totals
+    const allTimeCats = {}
+    allSpending.forEach(t => {
+      if (!allTimeCats[t.category]) allTimeCats[t.category] = 0
+      allTimeCats[t.category] += Math.abs(t.amount)
+    })
+    const allTimeTotal = Object.values(allTimeCats).reduce((s, v) => s + v, 0)
+    const allTimeCatLines = Object.entries(allTimeCats)
+      .sort(([,a],[,b]) => b - a)
+      .map(([cat, amt]) => `- ${cat}: $${amt.toFixed(2)}`)
+      .join('\n')
+
+    // Date range of available data
+    const dates = allSpending.map(t => {
+      const [m, d, y] = t.date.split('/')
+      return new Date(+y, +m - 1, +d)
+    })
+    const earliest = dates.length ? new Date(Math.min(...dates)).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'unknown'
+    const latest = dates.length ? new Date(Math.max(...dates)).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'unknown'
+
+    return `User's Grove finance data:
+
+DATA RANGE: ${earliest} to ${latest}
+
+CURRENT VIEW (${periodLabel}):
 Total spent: $${totalSpent.toFixed(2)}
-Number of transactions: ${purchaseCount}
+Transactions: ${purchaseCount}
 Daily average: $${dailyAvg.toFixed(2)}
 Top category: ${topCategory} ($${topCatAmt.toFixed(2)})
-Over-budget categories: ${overList}
+Over-budget categories: ${[...overBudgetCats].join(', ') || 'none'}
 
-Spending by category:
+Spending by category this period:
 ${catLines}
 
-Use this data to answer the user's questions accurately.`
-  }, [byCategory, dashBudgets, overBudgetCats, totalSpent, purchaseCount, dailyAvg, topCategory, topCatAmt, selectedPeriod])
+ALL-TIME TOTALS (${earliest} to ${latest}):
+Total spent: $${allTimeTotal.toFixed(2)}
+By category:
+${allTimeCatLines}
+
+FULL MONTHLY BREAKDOWN:
+${monthlyLines}
+
+Use all this data to answer questions accurately. If asked about a specific time period or month, calculate from the monthly breakdown.`
+  }, [allTx, byCategory, dashBudgets, overBudgetCats, totalSpent, purchaseCount, dailyAvg, topCategory, topCatAmt, selectedPeriod])
 
   const displayName = user?.user_metadata?.full_name?.split(' ')[0]
     ?? user?.email?.split('@')[0]

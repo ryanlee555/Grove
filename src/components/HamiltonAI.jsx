@@ -37,7 +37,7 @@ function TypingIndicator() {
   )
 }
 
-export default function HamiltonAI({ isOpen, onClose, userName, financialContext }) {
+export default function HamiltonAI({ isOpen, onClose, userName, displayName, financialContext }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -72,7 +72,7 @@ export default function HamiltonAI({ isOpen, onClose, userName, financialContext
         },
         body: JSON.stringify({
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
-          context: financialContext,
+          context: `The user's name is ${displayName || 'the user'}.\n\n${financialContext}`,
         }),
       })
 

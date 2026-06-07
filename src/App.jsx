@@ -1050,6 +1050,11 @@ function CardSection({ byCard, totalSpent, transactions, cardColorMap = {} }) {
 export default function App({ selectedPeriod, setSelectedPeriod }) {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [profile, setProfile] = useState({ display_name: '', avatar_url: '' })
+  const [settingName, setSettingName] = useState('')
+  const [settingAvatar, setSettingAvatar] = useState(null)
+  const [settingSaving, setSettingSaving] = useState(false)
   const [hamiltonOpen, setHamiltonOpen] = useState(false)
   const [hamiltonHovered, setHamiltonHovered] = useState(false)
   const [user, setUser] = useState(null)
@@ -1278,6 +1283,44 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     setSelectedPeriod({ preset: 'custom', start, end })
     setSortCol('date'); setSortDir('desc')
     setShowDatePicker(false)
+  }
+
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('user_profile').select('display_name, avatar_url').eq('user_id', user.id).single()
+      if (data) {
+        setProfile({ display_name: data.display_name ?? '', avatar_url: data.avatar_url ?? '' })
+        setSettingName(data.display_name ?? '')
+      }
+    }
+    loadProfile()
+  }, [])
+
+  const handleSaveProfile = async () => {
+    setSettingSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      let avatar_url = profile.avatar_url
+      if (settingAvatar) {
+        const ext = settingAvatar.name.split('.').pop()
+        await supabase.storage.from('avatars').upload(`${user.id}.${ext}`, settingAvatar, { upsert: true })
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${user.id}.${ext}`)
+        avatar_url = urlData.publicUrl
+      }
+      await supabase.from('user_profile').upsert({
+        user_id: user.id,
+        display_name: settingName,
+        avatar_url,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+      setProfile({ display_name: settingName, avatar_url })
+      setSettingAvatar(null)
+      setShowSettings(false)
+    } finally {
+      setSettingSaving(false)
+    }
   }
 
   const handleAddExpense = (e) => {
@@ -1582,8 +1625,12 @@ Use all this data to answer questions accurately. If asked about a specific time
             </div>
             <div className="relative" ref={dropdownRef}>
               <button onClick={() => setShowDropdown(s => !s)}
-                className="w-9 h-9 flex items-center justify-center rounded-full text-[13px] font-bold text-white transition-colors hover:opacity-90"
-                style={{ backgroundColor: 'var(--color-primary)', cursor: 'pointer' }}>P</button>
+                className="w-9 h-9 flex items-center justify-center rounded-full text-[13px] font-bold text-white transition-colors hover:opacity-90 overflow-hidden"
+                style={{ backgroundColor: profile.avatar_url ? 'transparent' : 'var(--color-primary)', cursor: 'pointer' }}>
+                {profile.avatar_url
+                  ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : (profile.display_name?.[0]?.toUpperCase() || 'P')}
+              </button>
               {showDropdown && (
                 <div className="absolute right-0 top-full mt-2 w-44 rounded-xl border shadow-2xl overflow-hidden z-50"
                   style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
@@ -1591,7 +1638,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                     <p className="text-[13px] font-semibold" style={{ color: 'var(--color-fg)' }}>Pingoo</p>
                     <p className="text-[11px]" style={{ color: 'var(--color-muted-text)' }}>Personal account</p>
                   </div>
-                  <button className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
+                  <button onClick={() => { setShowSettings(true); setShowDropdown(false) }} className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
                     style={{ color: 'var(--color-fg)', cursor: 'pointer' }}>Settings</button>
                   <button onClick={handleSignOut} className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80" style={{ cursor: 'pointer' }}>Sign out</button>
                 </div>
@@ -1922,6 +1969,7 @@ Use all this data to answer questions accurately. If asked about a specific time
           isOpen={hamiltonOpen}
           onClose={() => setHamiltonOpen(false)}
           userName={displayName}
+          displayName={profile.display_name}
           financialContext={hamiltonContext}
         />
       </div>
@@ -1963,6 +2011,81 @@ Use all this data to answer questions accurately. If asked about a specific time
                 Apply
               </button>
             </div>
+        </div>
+      )}
+
+      {/* ── Settings Modal ───────────────────────────────────────────────────── */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setShowSettings(false) }}>
+          <div className="w-full max-w-md mx-4 rounded-2xl border shadow-2xl"
+            style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b"
+              style={{ borderColor: 'var(--color-border)' }}>
+              <h2 className="text-[15px] font-semibold" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>Settings</h2>
+              <button onClick={() => setShowSettings(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                style={{ color: 'var(--color-muted-text)' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-5">
+              {/* Profile Photo */}
+              <div>
+                <p className="text-[11px] font-semibold mb-3" style={{ color: 'var(--color-muted-text)' }}>Profile Photo</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-[60px] h-[60px] rounded-full overflow-hidden flex items-center justify-center text-[22px] font-bold text-white shrink-0"
+                    style={{ backgroundColor: (settingAvatar || profile.avatar_url) ? 'transparent' : 'var(--color-primary)' }}>
+                    {settingAvatar
+                      ? <img src={URL.createObjectURL(settingAvatar)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : profile.avatar_url
+                        ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : (settingName?.[0]?.toUpperCase() || 'P')}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors cursor-pointer"
+                      style={{ backgroundColor: 'var(--color-muted-bg)', color: 'var(--color-fg)' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}>
+                      Upload photo
+                      <input type="file" accept="image/*" className="hidden" onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file) setSettingAvatar(file)
+                      }} />
+                    </label>
+                    <button onClick={() => { setSettingAvatar(null); setProfile(p => ({ ...p, avatar_url: '' })) }}
+                      className="text-left text-[12px] font-semibold"
+                      style={{ color: 'hsl(0, 65%, 50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {/* Display Name */}
+              <div>
+                <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Display Name</label>
+                <p className="text-[11px] mb-2" style={{ color: 'var(--color-muted-text)' }}>This is what Hamilton AI will call you.</p>
+                <input type="text" value={settingName} onChange={e => setSettingName(e.target.value)}
+                  placeholder="Your name" className={inputCls} style={inputStyle} />
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 pb-5">
+              <button onClick={handleSaveProfile} disabled={settingSaving}
+                className="flex-1 py-2.5 rounded-xl text-white text-[13px] font-semibold transition-colors hover:opacity-90"
+                style={{ backgroundColor: 'var(--color-primary)', opacity: settingSaving ? 0.7 : 1, cursor: settingSaving ? 'default' : 'pointer' }}>
+                {settingSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button type="button" onClick={() => setShowSettings(false)}
+                className="flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-colors"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-fg)', cursor: 'pointer' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

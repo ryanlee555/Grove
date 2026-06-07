@@ -42,7 +42,9 @@ Deno.serve(async (req) => {
 
     const { messages, context } = await req.json()
 
-    const systemPrompt = `${context}\n\nYou are Hamilton, a friendly personal finance assistant built into Grove. Be concise, specific, and use the user's actual financial data when answering. Format dollar amounts nicely. Don't be overly formal.`
+    const systemPrompt = `${context}
+
+You are Hamilton, a personal finance assistant built into Grove. Keep replies short and conversational — 2-3 sentences max unless the user asks for detail. Use the user's actual data. No markdown formatting (no asterisks, no bold, no bullet points). Just plain friendly text. Use emojis sparingly.`
 
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

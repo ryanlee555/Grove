@@ -1051,9 +1051,10 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [profile, setProfile] = useState({ display_name: '', avatar_url: '' })
+  const [profile, setProfile] = useState({ display_name: '', avatar_url: '', hamilton_style: 'default' })
   const [settingName, setSettingName] = useState('')
   const [settingAvatar, setSettingAvatar] = useState(null)
+  const [settingStyle, setSettingStyle] = useState('default')
   const [settingSaving, setSettingSaving] = useState(false)
   const [hamiltonOpen, setHamiltonOpen] = useState(false)
   const [hamiltonHovered, setHamiltonHovered] = useState(false)
@@ -1289,10 +1290,11 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('user_profile').select('display_name, avatar_url').eq('user_id', user.id).single()
+      const { data } = await supabase.from('user_profile').select('display_name, avatar_url, hamilton_style').eq('user_id', user.id).single()
       if (data) {
-        setProfile({ display_name: data.display_name ?? '', avatar_url: data.avatar_url ?? '' })
+        setProfile({ display_name: data.display_name ?? '', avatar_url: data.avatar_url ?? '', hamilton_style: data.hamilton_style ?? 'default' })
         setSettingName(data.display_name ?? '')
+        setSettingStyle(data.hamilton_style ?? 'default')
       }
     }
     loadProfile()
@@ -1313,9 +1315,10 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         user_id: user.id,
         display_name: settingName,
         avatar_url,
+        hamilton_style: settingStyle,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
-      setProfile({ display_name: settingName, avatar_url })
+      setProfile({ display_name: settingName, avatar_url, hamilton_style: settingStyle })
       setSettingAvatar(null)
       setShowSettings(false)
     } finally {
@@ -1970,6 +1973,7 @@ Use all this data to answer questions accurately. If asked about a specific time
           onClose={() => setHamiltonOpen(false)}
           userName={displayName}
           displayName={profile.display_name}
+          hamiltonStyle={profile.hamilton_style}
           financialContext={hamiltonContext}
         />
       </div>
@@ -2018,9 +2022,9 @@ Use all this data to answer questions accurately. If asked about a specific time
       {showSettings && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setShowSettings(false) }}>
-          <div className="w-full max-w-md mx-4 rounded-2xl border shadow-2xl"
-            style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b"
+          <div className="w-full max-w-md mx-4 rounded-2xl border shadow-2xl flex flex-col"
+            style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', maxHeight: '90vh' }}>
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b shrink-0"
               style={{ borderColor: 'var(--color-border)' }}>
               <h2 className="text-[15px] font-semibold" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>Settings</h2>
               <button onClick={() => setShowSettings(false)}
@@ -2031,7 +2035,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                 <X size={14} />
               </button>
             </div>
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
               {/* Profile Photo */}
               <div>
                 <p className="text-[11px] font-semibold mb-3" style={{ color: 'var(--color-muted-text)' }}>Profile Photo</p>
@@ -2070,8 +2074,37 @@ Use all this data to answer questions accurately. If asked about a specific time
                 <input type="text" value={settingName} onChange={e => setSettingName(e.target.value)}
                   placeholder="Your name" className={inputCls} style={inputStyle} />
               </div>
+              {/* Hamilton AI Style */}
+              <div>
+                <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Hamilton AI Style</label>
+                <p className="text-[11px] mb-2.5" style={{ color: 'var(--color-muted-text)' }}>Choose how Hamilton communicates with you.</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { id: 'default',  name: 'Default',  desc: 'Balanced and friendly, like a knowledgeable friend.' },
+                    { id: 'concise',  name: 'Concise',  desc: 'Short and direct. No fluff, just the numbers.' },
+                    { id: 'detailed', name: 'Detailed', desc: 'Deep dives with full breakdowns and context.' },
+                    { id: 'hype',     name: 'Hype',     desc: 'Enthusiastic and encouraging about every win.' },
+                    { id: 'roast',    name: 'Roast',    desc: 'Brutally honest about your spending. No filter.' },
+                  ].map(({ id, name, desc }) => {
+                    const isSelected = settingStyle === id
+                    return (
+                      <button key={id} type="button" onClick={() => setSettingStyle(id)}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                          width: '100%', textAlign: 'left', padding: '10px 14px', borderRadius: 10,
+                          border: `1.5px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                          backgroundColor: isSelected ? 'hsl(145, 38%, 34%, 0.08)' : 'transparent',
+                          cursor: 'pointer', transition: 'border-color 0.15s, background-color 0.15s',
+                        }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: isSelected ? 'var(--color-primary)' : 'var(--color-fg)', fontFamily: "'DM Sans', sans-serif" }}>{name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--color-muted-text)', marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="flex gap-3 px-6 pb-5">
+            <div className="flex gap-3 px-6 pb-5 shrink-0">
               <button onClick={handleSaveProfile} disabled={settingSaving}
                 className="flex-1 py-2.5 rounded-xl text-white text-[13px] font-semibold transition-colors hover:opacity-90"
                 style={{ backgroundColor: 'var(--color-primary)', opacity: settingSaving ? 0.7 : 1, cursor: settingSaving ? 'default' : 'pointer' }}>

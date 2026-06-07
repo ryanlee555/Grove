@@ -139,6 +139,7 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
   const [showHamilton, setShowHamilton] = useState(false)
   const [hamiltonOpen, setHamiltonOpen] = useState(false)
   const [hamiltonHovered, setHamiltonHovered] = useState(false)
+  const [hamiltonStyle, setHamiltonStyle] = useState('default')
   const [user, setUser] = useState(null)
   const [highlightOver, setHighlightOver] = useState(false)
   const cardsGridRef = useRef(null)
@@ -158,6 +159,9 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
     setUser(user)
     setUserId(user.id)
     setUserEmail(user.email ?? '')
+
+    const { data: profileData } = await supabase.from('user_profile').select('hamilton_style').eq('user_id', user.id).single()
+    setHamiltonStyle(profileData?.hamilton_style ?? 'default')
 
     const res = await fetch(GET_TRANSACTIONS_URL, {
       method: 'POST',
@@ -683,6 +687,7 @@ Use this data to answer the user's questions about their budgets accurately.`
         isOpen={hamiltonOpen}
         onClose={() => setHamiltonOpen(false)}
         userName={displayName}
+        hamiltonStyle={hamiltonStyle}
         financialContext={hamiltonContext}
       />
     </div>

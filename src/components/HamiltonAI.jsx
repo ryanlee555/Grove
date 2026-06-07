@@ -37,7 +37,14 @@ function TypingIndicator() {
   )
 }
 
-export default function HamiltonAI({ isOpen, onClose, userName, displayName, financialContext }) {
+const STYLE_INSTRUCTIONS = {
+  concise:  'Keep all responses very short and to the point. No lengthy explanations.',
+  detailed: 'Give thorough, detailed responses with full context and breakdowns.',
+  hype:     'Be enthusiastic and encouraging. Celebrate wins and motivate the user.',
+  roast:    "Be brutally honest and don't sugarcoat anything about the user's spending habits. Roast them when appropriate.",
+}
+
+export default function HamiltonAI({ isOpen, onClose, userName, displayName, hamiltonStyle, financialContext }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -72,7 +79,7 @@ export default function HamiltonAI({ isOpen, onClose, userName, displayName, fin
         },
         body: JSON.stringify({
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
-          context: `The user's name is ${displayName || 'the user'}.\n\n${financialContext}`,
+          context: `The user's name is ${displayName || 'the user'}.${STYLE_INSTRUCTIONS[hamiltonStyle] ? ' ' + STYLE_INSTRUCTIONS[hamiltonStyle] : ''}\n\n${financialContext}`,
         }),
       })
 

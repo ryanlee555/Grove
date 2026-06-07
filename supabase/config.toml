@@ -31,3 +31,9 @@ entrypoint = "./functions/get-transactions/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/get-transactions/*.html" ]
+
+[functions.hamilton-chat]
+enabled = true
+verify_jwt = true
+import_map = "./functions/hamilton-chat/deno.json"
+entrypoint = "./functions/hamilton-chat/index.ts"

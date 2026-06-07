@@ -191,7 +191,7 @@ export default function HamiltonAI({ isOpen, onClose, userName, displayName, fin
                 fontSize: 13,
                 lineHeight: 1.5,
               }}>
-                Hey {userName}, how can I help you today?
+                Hey {displayName || userName}, how can I help you today?
               </div>
               <div style={{
                 fontSize: 10,

@@ -4,6 +4,7 @@ import { Check } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import LeafIcon from '../components/LeafIcon'
 import ArcSlider from '../components/ArcSlider'
+import HamiltonAI from '../components/HamiltonAI'
 
 const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
@@ -135,6 +136,8 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
   const [editing, setEditing]       = useState({})
   const [saving, setSaving]         = useState({})
   const [showHamilton, setShowHamilton] = useState(false)
+  const [hamiltonOpen, setHamiltonOpen] = useState(false)
+  const [user, setUser] = useState(null)
   const [highlightOver, setHighlightOver] = useState(false)
   const cardsGridRef = useRef(null)
 
@@ -150,6 +153,7 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
     if (!session) { setLoading(false); return }
 
     const { data: { user } } = await supabase.auth.getUser()
+    setUser(user)
     setUserId(user.id)
     setUserEmail(user.email ?? '')
 
@@ -296,6 +300,30 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
   const totalSpent    = CATEGORIES.reduce((s, c) => s + (spending[c] ?? 0), 0)
   const overCount     = CATEGORIES.filter(c => effectiveLimits[c] != null && (spending[c] ?? 0) > effectiveLimits[c]).length
 
+  const budgetedCategories = useMemo(() => CATEGORIES.filter(c => budgets[c] != null), [budgets])
+  const categorySpend = spending
+
+  const hamiltonContext = useMemo(() => {
+    const catLines = budgetedCategories.map(c => {
+      const spent = categorySpend[c] ?? 0
+      const limit = budgets[c]
+      const over = spent > limit
+      return `- ${c}: spent $${spent.toFixed(2)} of $${limit.toFixed(2)} budget${over ? ` (OVER by $${(spent - limit).toFixed(2)})` : ''}`
+    }).join('\n')
+    const totalBudgetedAmt = budgetedCategories.reduce((s, c) => s + (budgets[c] ?? 0), 0)
+    const totalSpentAll = budgetedCategories.reduce((s, c) => s + (categorySpend[c] ?? 0), 0)
+    const overCountAmt = budgetedCategories.filter(c => (categorySpend[c] ?? 0) > (budgets[c] ?? 0)).length
+    return `The user is viewing their Grove budgets page.
+Total budgeted: $${totalBudgetedAmt.toFixed(2)}
+Total spent against budgets: $${totalSpentAll.toFixed(2)}
+Categories over budget: ${overCountAmt}
+
+Budget breakdown:
+${catLines}
+
+Use this data to answer the user's questions about their budgets accurately.`
+  }, [budgetedCategories, budgets, categorySpend])
+
   const totalSpentColor = totalBudgeted === 0
     ? 'var(--color-fg)'
     : totalSpent > totalBudgeted
@@ -381,6 +409,9 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
   const maxDateStr = toInputDate(todayDate)
 
   const avatarLetter = userEmail ? userEmail[0].toUpperCase() : '?'
+  const displayName = user?.user_metadata?.full_name?.split(' ')[0]
+    ?? user?.email?.split('@')[0]
+    ?? 'there'
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -431,11 +462,13 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
             onMouseEnter={() => setShowHamilton(true)}
             onMouseLeave={() => setShowHamilton(false)}
           >
-            <button style={{
-              width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: 'none', cursor: 'pointer', borderRadius: 12,
-              fontSize: 18, color: 'var(--color-muted-text)',
-            }}>
+            <button
+              onClick={() => setHamiltonOpen(true)}
+              style={{
+                width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'none', border: 'none', cursor: 'pointer', borderRadius: 12,
+                fontSize: 18, color: 'var(--color-muted-text)',
+              }}>
               💵
             </button>
             {showHamilton && (
@@ -633,6 +666,13 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
           onCancel={handleModalCancel}
         />
       )}
+
+      <HamiltonAI
+        isOpen={hamiltonOpen}
+        onClose={() => setHamiltonOpen(false)}
+        userName={displayName}
+        financialContext={hamiltonContext}
+      />
     </div>
   )
 }

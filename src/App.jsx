@@ -8,6 +8,7 @@ import {
 import { ChevronDown, X, Plus } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import LeafIcon from './components/LeafIcon'
+import HamiltonAI from './components/HamiltonAI'
 
 const GET_TRANSACTIONS_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/get-transactions'
 
@@ -1041,6 +1042,8 @@ function CardSection({ byCard, totalSpent, transactions, cardColorMap = {} }) {
 export default function App({ selectedPeriod, setSelectedPeriod }) {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [hamiltonOpen, setHamiltonOpen] = useState(false)
+  const [user, setUser] = useState(null)
   const dropdownRef = useRef(null)
 
   const handleSignOut = async () => {
@@ -1140,6 +1143,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
         // Load overrides from Supabase and merge
         const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
         const { data: overrides } = await supabase
           .from('transaction_overrides')
           .select('*')
@@ -1413,6 +1417,31 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const rangeDays     = Math.max(1, Math.ceil((selectedPeriod.end - selectedPeriod.start) / (1000*60*60*24)) + 1)
   const dailyAvg      = totalSpent / rangeDays
 
+  const hamiltonContext = useMemo(() => {
+    const periodLabel = selectedPeriod.label ?? formatRangeLabel(selectedPeriod.preset, selectedPeriod.start, selectedPeriod.end)
+    const catLines = byCategory.map(c => {
+      const budget = dashBudgets[c.name]
+      const over = budget != null && c.value > budget
+      return `- ${c.name}: $${c.value.toFixed(2)}${budget != null ? ` (budget: $${budget}, ${over ? 'OVER by $' + (c.value - budget).toFixed(2) : 'under budget'})` : ''}`
+    }).join('\n')
+    const overList = [...overBudgetCats].join(', ') || 'none'
+    return `The user's Grove finance dashboard data for ${periodLabel}:
+Total spent: $${totalSpent.toFixed(2)}
+Number of transactions: ${purchaseCount}
+Daily average: $${dailyAvg.toFixed(2)}
+Top category: ${topCategory} ($${topCatAmt.toFixed(2)})
+Over-budget categories: ${overList}
+
+Spending by category:
+${catLines}
+
+Use this data to answer the user's questions accurately.`
+  }, [byCategory, dashBudgets, overBudgetCats, totalSpent, purchaseCount, dailyAvg, topCategory, topCatAmt, selectedPeriod])
+
+  const displayName = user?.user_metadata?.full_name?.split(' ')[0]
+    ?? user?.email?.split('@')[0]
+    ?? 'there'
+
   const sortedAccounts = useMemo(() => {
     const visibleIds = accountOrder.filter(id => !(accountSettings[id]?.hidden ?? false))
     const hiddenIds  = accountOrder.filter(id =>   accountSettings[id]?.hidden ?? false)
@@ -1464,7 +1493,8 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
             </button>
             <div className="relative group">
               <button className="w-9 h-9 flex items-center justify-center rounded-xl text-lg transition-colors"
-                style={{ color: 'var(--color-muted-text)' }}>💵</button>
+                style={{ color: 'var(--color-muted-text)' }}
+                onClick={() => setHamiltonOpen(true)}>💵</button>
               <div className="pointer-events-none absolute right-0 top-full mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 border"
                 style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}>
                 Hamilton AI
@@ -1807,6 +1837,13 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
           </div>
         </main>
+
+        <HamiltonAI
+          isOpen={hamiltonOpen}
+          onClose={() => setHamiltonOpen(false)}
+          userName={displayName}
+          financialContext={hamiltonContext}
+        />
       </div>
 
       {/* ── Date Range Picker ─────────────────────────────────────────────────── */}

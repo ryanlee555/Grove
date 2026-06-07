@@ -1936,8 +1936,8 @@ Use all this data to answer questions accurately. If asked about a specific time
                 <button key={p.id} onClick={() => applyPreset(p.id)}
                   className="px-3 py-2 rounded-lg text-[11px] font-semibold text-left transition-colors"
                   style={selectedPeriod.preset === p.id
-                    ? { backgroundColor: 'var(--color-primary)', color: 'white' }
-                    : { color: 'var(--color-fg)' }}
+                    ? { backgroundColor: 'var(--color-primary)', color: 'white', cursor: 'pointer' }
+                    : { color: 'var(--color-fg)', cursor: 'pointer' }}
                   onMouseEnter={e => { if (selectedPeriod.preset !== p.id) e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)' }}
                   onMouseLeave={e => { if (selectedPeriod.preset !== p.id) e.currentTarget.style.backgroundColor = 'transparent' }}>
                   {p.label}
@@ -1950,16 +1950,16 @@ Use all this data to answer questions accurately. If asked about a specific time
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[10px] mb-1" style={{ color: 'var(--color-muted-text)' }}>From</label>
-                  <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={inputCls} style={inputStyle} />
+                  <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={inputCls} style={{ ...inputStyle, cursor: 'pointer' }} />
                 </div>
                 <div>
                   <label className="block text-[10px] mb-1" style={{ color: 'var(--color-muted-text)' }}>To</label>
-                  <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputCls} style={inputStyle} />
+                  <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputCls} style={{ ...inputStyle, cursor: 'pointer' }} />
                 </div>
               </div>
               <button onClick={applyCustom}
                 className="w-full mt-1 py-2 rounded-lg text-white text-[12px] font-semibold transition-colors hover:opacity-90"
-                style={{ backgroundColor: 'var(--color-primary)' }}>
+                style={{ backgroundColor: 'var(--color-primary)', cursor: 'pointer' }}>
                 Apply
               </button>
             </div>

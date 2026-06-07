@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import supabase from '../supabaseClient'
+import { supabase } from '../supabaseClient'
 
 const EDGE_URL = 'https://dovjukmgimhslsskmjhk.supabase.co/functions/v1/hamilton-chat'
 

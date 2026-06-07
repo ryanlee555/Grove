@@ -213,13 +213,20 @@ export default function HamiltonAI({ isOpen, onClose, userName, displayName, ham
           {messages.map((msg, i) => {
             const isUser = msg.role === 'user'
             return (
-              <div key={i} style={{ alignSelf: isUser ? 'flex-end' : 'flex-start', display: 'flex', flexDirection: 'column' }}>
+              <div key={i} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: isUser ? 'flex-end' : 'flex-start',
+              }}>
                 <div style={{
                   background: isUser ? 'var(--color-primary)' : 'var(--color-muted-bg)',
                   color: isUser ? 'white' : 'var(--color-fg)',
                   padding: '10px 14px',
                   borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                  maxWidth: '85%',
+                  display: 'inline-block',
+                  width: 'fit-content',
+                  maxWidth: '75%',
+                  marginLeft: isUser ? 'auto' : undefined,
                   fontSize: 13,
                   lineHeight: 1.5,
                   whiteSpace: 'pre-wrap',
@@ -231,7 +238,6 @@ export default function HamiltonAI({ isOpen, onClose, userName, displayName, ham
                   fontSize: 10,
                   color: 'var(--color-muted-text)',
                   marginTop: 2,
-                  alignSelf: isUser ? 'flex-end' : 'flex-start',
                 }}>
                   {formatTime(msg.time)}
                 </div>

@@ -1044,6 +1044,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
   const [hamiltonOpen, setHamiltonOpen] = useState(false)
+  const [hamiltonHovered, setHamiltonHovered] = useState(false)
   const [user, setUser] = useState(null)
   const dropdownRef = useRef(null)
 
@@ -1453,7 +1454,17 @@ Use this data to answer the user's questions accurately.`
 
   return (
     <div>
-      <style>{`@keyframes fadeIn { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }`}</style>
+      <style>{`
+        @keyframes fadeIn { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }
+        @keyframes hamiltonWiggle {
+          0%   { transform: rotate(0deg); }
+          20%  { transform: rotate(-8deg); }
+          40%  { transform: rotate(8deg); }
+          60%  { transform: rotate(-4deg); }
+          80%  { transform: rotate(4deg); }
+          100% { transform: rotate(0deg); }
+        }
+      `}</style>
 
       <div className="h-screen flex flex-col antialiased overflow-hidden"
         style={{ backgroundColor: 'var(--color-bg)' }}>
@@ -1487,16 +1498,18 @@ Use this data to answer the user's questions accurately.`
             <button
               onClick={() => navigate('/onboarding')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-colors"
-              style={{ backgroundColor: 'var(--color-muted-bg)', color: 'var(--color-fg)' }}
+              style={{ backgroundColor: 'var(--color-muted-bg)', color: 'var(--color-fg)', cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}>
               <Plus size={11} /> Add bank
             </button>
             <div className="relative group">
               <button className="w-9 h-9 flex items-center justify-center rounded-xl text-lg transition-colors"
-                style={{ color: 'var(--color-muted-text)' }}
-                onClick={() => setHamiltonOpen(true)}>
-                <img src={hamiltonIcon} alt="Hamilton AI" style={{ width: 24, height: 24 }} />
+                style={{ color: 'var(--color-muted-text)', cursor: 'pointer' }}
+                onClick={() => setHamiltonOpen(true)}
+                onMouseEnter={() => setHamiltonHovered(true)}
+                onMouseLeave={() => setHamiltonHovered(false)}>
+                <img src={hamiltonIcon} alt="Hamilton AI" style={{ width: 30, height: 30, animation: hamiltonHovered ? 'hamiltonWiggle 0.4s ease forwards' : 'none' }} />
               </button>
               <div className="pointer-events-none absolute right-0 top-full mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 border"
                 style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}>
@@ -1506,7 +1519,7 @@ Use this data to answer the user's questions accurately.`
             <div className="relative" ref={dropdownRef}>
               <button onClick={() => setShowDropdown(s => !s)}
                 className="w-9 h-9 flex items-center justify-center rounded-full text-[13px] font-bold text-white transition-colors hover:opacity-90"
-                style={{ backgroundColor: 'var(--color-primary)' }}>P</button>
+                style={{ backgroundColor: 'var(--color-primary)', cursor: 'pointer' }}>P</button>
               {showDropdown && (
                 <div className="absolute right-0 top-full mt-2 w-44 rounded-xl border shadow-2xl overflow-hidden z-50"
                   style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)' }}>

@@ -138,6 +138,7 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
   const [saving, setSaving]         = useState({})
   const [showHamilton, setShowHamilton] = useState(false)
   const [hamiltonOpen, setHamiltonOpen] = useState(false)
+  const [hamiltonHovered, setHamiltonHovered] = useState(false)
   const [user, setUser] = useState(null)
   const [highlightOver, setHighlightOver] = useState(false)
   const cardsGridRef = useRef(null)
@@ -417,6 +418,16 @@ Use this data to answer the user's questions about their budgets accurately.`
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg)', fontFamily: "'DM Sans', sans-serif", color: 'var(--color-fg)' }}>
+      <style>{`
+        @keyframes hamiltonWiggle {
+          0%   { transform: rotate(0deg); }
+          20%  { transform: rotate(-8deg); }
+          40%  { transform: rotate(8deg); }
+          60%  { transform: rotate(-4deg); }
+          80%  { transform: rotate(4deg); }
+          100% { transform: rotate(0deg); }
+        }
+      `}</style>
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header style={{
@@ -460,8 +471,8 @@ Use this data to answer the user's questions about their budgets accurately.`
 
           {/* Hamilton AI emoji button */}
           <div style={{ position: 'relative' }}
-            onMouseEnter={() => setShowHamilton(true)}
-            onMouseLeave={() => setShowHamilton(false)}
+            onMouseEnter={() => { setShowHamilton(true); setHamiltonHovered(true) }}
+            onMouseLeave={() => { setShowHamilton(false); setHamiltonHovered(false) }}
           >
             <button
               onClick={() => setHamiltonOpen(true)}
@@ -470,7 +481,7 @@ Use this data to answer the user's questions about their budgets accurately.`
                 background: 'none', border: 'none', cursor: 'pointer', borderRadius: 12,
                 fontSize: 18, color: 'var(--color-muted-text)',
               }}>
-              <img src={hamiltonIcon} alt="Hamilton AI" style={{ width: 24, height: 24 }} />
+              <img src={hamiltonIcon} alt="Hamilton AI" style={{ width: 30, height: 30, animation: hamiltonHovered ? 'hamiltonWiggle 0.4s ease forwards' : 'none' }} />
             </button>
             {showHamilton && (
               <div style={{

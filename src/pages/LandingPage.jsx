@@ -925,6 +925,8 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
   const [showHamiltonTip, setShowHamiltonTip] = useState(false)
   const [hamiltonHovered, setHamiltonHovered] = useState(false)
+  const [showHamiltonPopover, setShowHamiltonPopover] = useState(false)
+  const hamiltonRef = useRef(null)
 
   const NAV_LINKS = [
     { label: 'Features',     href: '#features'        },
@@ -967,6 +969,18 @@ export default function LandingPage() {
     document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el))
     return () => observer.disconnect()
   }, [])
+
+  // Close Hamilton popover on outside click
+  useEffect(() => {
+    if (!showHamiltonPopover) return
+    const onDocMD = (e) => {
+      if (hamiltonRef.current && !hamiltonRef.current.contains(e.target)) {
+        setShowHamiltonPopover(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocMD)
+    return () => document.removeEventListener('mousedown', onDocMD)
+  }, [showHamiltonPopover])
 
   // Nav smooth scroll handler
   const handleNavClick = (e, href) => {
@@ -1014,7 +1028,9 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div style={{ position: 'relative' }}
+            <div
+              ref={hamiltonRef}
+              style={{ position: 'relative' }}
               onMouseEnter={() => setShowHamiltonTip(true)}
               onMouseLeave={() => setShowHamiltonTip(false)}
             >
@@ -1030,8 +1046,9 @@ export default function LandingPage() {
                 }}
                 onMouseEnter={() => setHamiltonHovered(true)}
                 onMouseLeave={() => setHamiltonHovered(false)}
+                onClick={() => setShowHamiltonPopover(s => !s)}
               />
-              {showHamiltonTip && (
+              {showHamiltonTip && !showHamiltonPopover && (
                 <div style={{
                   position: 'absolute',
                   right: 0,
@@ -1050,6 +1067,54 @@ export default function LandingPage() {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                 }}>
                   Hamilton AI
+                </div>
+              )}
+              {showHamiltonPopover && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: 10,
+                  width: 220,
+                  backgroundColor: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 14,
+                  padding: '12px 14px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+                  zIndex: 200,
+                }}>
+                  {/* Caret */}
+                  <div style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: 10,
+                    width: 0,
+                    height: 0,
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderBottom: '6px solid var(--color-border)',
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: -5,
+                    right: 10,
+                    width: 0,
+                    height: 0,
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderBottom: '6px solid var(--color-bg-card)',
+                  }} />
+                  {/* Header row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <img src={hamiltonIcon} style={{ width: 20, height: 20, objectFit: 'contain' }} alt="" />
+                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, fontWeight: 600, color: 'var(--color-fg)' }}>
+                      Hamilton AI
+                    </span>
+                  </div>
+                  {/* Description */}
+                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: 'var(--color-muted-text)', lineHeight: 1.5, margin: 0 }}>
+                    Your personal finance advisor inside Grove. Ask Hamilton anything about your spending, budgets, or habits — and get a straight answer.
+                  </p>
                 </div>
               )}
             </div>

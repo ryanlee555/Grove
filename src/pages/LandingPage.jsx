@@ -928,6 +928,9 @@ const HAMILTON_QUIPS = [
   '"You saved 18% last month. Hamilton approves."',
 ]
 
+const MASCOT_H = 88   // approximate full height (image + legs)
+const MASCOT_CX = 26  // horizontal center offset from posX (image is 52px wide)
+
 function HamiltonMascot() {
   const navigate = useNavigate()
   const [posX, setPosX] = useState(0)
@@ -950,34 +953,159 @@ function HamiltonMascot() {
   const scrollT2 = useRef(null)
   const wrapperRef = useRef(null)
   const popoverRef = useRef(null)
-  const gravityRef = useRef(1)
-  const dropIntervalRef = useRef(null)
 
-  // Init positions client-side and track resize
-  useEffect(() => {
-    setPosX(window.innerWidth * 0.12)
-    setPosY(window.innerHeight - 88)
-    lastScrollY.current = window.scrollY
-    const onResize = () => { if (!isDragging.current) setPosY(window.innerHeight - 88) }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+  // Physics refs — source of truth; state is derived for rendering only
+  const posXRef = useRef(0)
+  const posYRef = useRef(0)
+  const prevPosY = useRef(0)
+  const velY = useRef(0)
+  const isGrounded = useRef(false)
+  const currentPlatform = useRef(null)  // { el, left, right, top }
+  const platformsRef = useRef([])
+  const platformScrollTimer = useRef(null)
+
+  const recalcPlatforms = useCallback(() => {
+    const selectors = ['.animate-on-scroll', 'nav', 'footer', 'section', '.rounded-2xl']
+    const seen = new Set()
+    const platforms = []
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => {
+        if (seen.has(el)) return
+        seen.add(el)
+        const r = el.getBoundingClientRect()
+        if (r.width > 80 && r.height > 30 && r.top > MASCOT_H) {
+          platforms.push({ el, left: r.left, right: r.right, top: r.top, bottom: r.bottom })
+        }
+      })
+    })
+    platformsRef.current = platforms
+    // Refresh current platform rect if grounded on one
+    if (currentPlatform.current?.el) {
+      const r = currentPlatform.current.el.getBoundingClientRect()
+      currentPlatform.current = { ...currentPlatform.current, left: r.left, right: r.right, top: r.top }
+    }
   }, [])
 
-  // Walk at 32ms, 0.6px per tick, continuous edge-flip only
+  // Init positions + spawn on highest platform in bottom 40% of viewport
+  useEffect(() => {
+    posXRef.current = window.innerWidth * 0.12
+    setPosX(posXRef.current)
+    lastScrollY.current = window.scrollY
+
+    const spawnOnPlatform = () => {
+      recalcPlatforms()
+      const vh = window.innerHeight
+      const candidates = platformsRef.current
+        .filter(p => p.top >= vh * 0.6 && p.top < vh - 10)
+        .sort((a, b) => a.top - b.top)
+      const spawn = candidates[0]
+      posYRef.current = spawn ? spawn.top - MASCOT_H : vh - MASCOT_H
+      isGrounded.current = true
+      currentPlatform.current = spawn || null
+      prevPosY.current = posYRef.current
+      setPosY(posYRef.current)
+    }
+    setTimeout(spawnOnPlatform, 500)
+
+    const onResize = () => {
+      recalcPlatforms()
+      if (!isDragging.current && isGrounded.current && !currentPlatform.current) {
+        posYRef.current = window.innerHeight - MASCOT_H
+        setPosY(posYRef.current)
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [recalcPlatforms])
+
+  // Recalc platforms on scroll (throttled 200ms)
+  useEffect(() => {
+    const onScroll = () => {
+      if (platformScrollTimer.current) clearTimeout(platformScrollTimer.current)
+      platformScrollTimer.current = setTimeout(recalcPlatforms, 200)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [recalcPlatforms])
+
+  // Walk + physics at 32ms
   useEffect(() => {
     const id = setInterval(() => {
       if (isDragging.current) return
-      setPosX(prev => {
-        const next = prev + dirRef.current * 0.6
-        if (next < -80 && dirRef.current < 0) {
-          dirRef.current = 1
-          setFacingLeft(false)
-        } else if (next > window.innerWidth + 20 && dirRef.current > 0) {
-          dirRef.current = -1
-          setFacingLeft(true)
+
+      // X movement
+      let nextX = posXRef.current + dirRef.current * 0.6
+      if (nextX < -80 && dirRef.current < 0) {
+        dirRef.current = 1
+        setFacingLeft(false)
+      } else if (nextX > window.innerWidth + 20 && dirRef.current > 0) {
+        dirRef.current = -1
+        setFacingLeft(true)
+      }
+      posXRef.current = nextX
+      const cx = posXRef.current + MASCOT_CX
+
+      // Y physics
+      prevPosY.current = posYRef.current
+
+      if (isGrounded.current) {
+        if (currentPlatform.current?.el) {
+          // Read live rect so scroll position is always accurate
+          const r = currentPlatform.current.el.getBoundingClientRect()
+          currentPlatform.current = { ...currentPlatform.current, left: r.left, right: r.right, top: r.top }
+          const cp = currentPlatform.current
+          if (cp.top < -MASCOT_H || cp.top > window.innerHeight + 20) {
+            // Platform scrolled off screen — fall
+            isGrounded.current = false
+            velY.current = 0
+          } else if (cx < cp.left + 5 || cx > cp.right - 5) {
+            // Walked off edge
+            isGrounded.current = false
+            velY.current = 2
+          } else {
+            posYRef.current = cp.top - MASCOT_H
+            velY.current = 0
+          }
+        } else {
+          // On floor
+          posYRef.current = window.innerHeight - MASCOT_H
+          velY.current = 0
         }
-        return next
-      })
+      }
+
+      if (!isGrounded.current) {
+        velY.current = Math.min(velY.current + 0.5, 18)
+        posYRef.current += velY.current
+        const prevBottom = prevPosY.current + MASCOT_H
+        const newBottom = posYRef.current + MASCOT_H
+
+        // Check platform landing (first hit when sorted top-ascending)
+        const hit = platformsRef.current
+          .filter(p => cx >= p.left && cx <= p.right && prevBottom <= p.top && newBottom >= p.top)
+          .sort((a, b) => a.top - b.top)[0]
+
+        if (hit) {
+          posYRef.current = hit.top - MASCOT_H
+          velY.current = 0
+          isGrounded.current = true
+          currentPlatform.current = hit
+          setScrollAnim('land')
+          setTimeout(() => setScrollAnim(''), 200)
+        } else {
+          const floor = window.innerHeight - MASCOT_H
+          if (posYRef.current >= floor) {
+            posYRef.current = floor
+            velY.current = 0
+            isGrounded.current = true
+            currentPlatform.current = null
+            setScrollAnim('land')
+            setTimeout(() => setScrollAnim(''), 200)
+          }
+        }
+      }
+
+      setPosX(posXRef.current)
+      setPosY(posYRef.current)
     }, 32)
     return () => clearInterval(id)
   }, [])
@@ -1014,38 +1142,25 @@ function HamiltonMascot() {
       const dy = e.clientY - mouseDownYRef.current
       if (Math.sqrt(dx * dx + dy * dy) > 5) mouseMoved.current = true
       if (isDragging.current) {
-        setPosX(e.clientX - dragOffsetX.current)
-        setPosY(e.clientY - 40)
+        posXRef.current = e.clientX - dragOffsetX.current
+        posYRef.current = e.clientY - 40
+        setPosX(posXRef.current)
+        setPosY(posYRef.current)
       }
     }
     const onUp = () => {
       if (!isDragging.current) return
       isDragging.current = false
       setDragging(false)
-      // Gravity drop: accelerate downward until floor
-      gravityRef.current = 1
-      dropIntervalRef.current = setInterval(() => {
-        setPosY(prev => {
-          const floor = window.innerHeight - 88
-          if (prev >= floor) {
-            clearInterval(dropIntervalRef.current)
-            dropIntervalRef.current = null
-            setScrollAnim('land')
-            setTimeout(() => setScrollAnim(''), 250)
-            return floor
-          }
-          const next = prev + gravityRef.current
-          gravityRef.current += 0.4
-          return next >= floor ? floor : next
-        })
-      }, 16)
+      // Physics tick takes over — just release into freefall
+      isGrounded.current = false
+      velY.current = 0
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
-      if (dropIntervalRef.current) clearInterval(dropIntervalRef.current)
     }
   }, [])
 
@@ -1064,13 +1179,11 @@ function HamiltonMascot() {
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
     e.preventDefault()
-    if (dropIntervalRef.current) {
-      clearInterval(dropIntervalRef.current)
-      dropIntervalRef.current = null
-    }
     isDragging.current = true
+    isGrounded.current = false
+    velY.current = 0
     setDragging(true)
-    dragOffsetX.current = e.clientX - posX
+    dragOffsetX.current = e.clientX - posXRef.current
     mouseDownXRef.current = e.clientX
     mouseDownYRef.current = e.clientY
     mouseMoved.current = false
@@ -1092,13 +1205,15 @@ function HamiltonMascot() {
           0%   { transform: translateY(0px)  rotate(-1deg); }
           100% { transform: translateY(-4px) rotate(1deg);  }
         }
-        @keyframes hm-leg-l-kf {
-          0%   { transform: rotate(-18deg); }
-          100% { transform: rotate(8deg);   }
+        @keyframes hm-leg-l {
+          0%   { transform: rotate(-22deg); transform-origin: 50% 0%; }
+          50%  { transform: rotate(22deg);  transform-origin: 50% 0%; }
+          100% { transform: rotate(-22deg); transform-origin: 50% 0%; }
         }
-        @keyframes hm-leg-r-kf {
-          0%   { transform: rotate(8deg);   }
-          100% { transform: rotate(-18deg); }
+        @keyframes hm-leg-r {
+          0%   { transform: rotate(22deg);  transform-origin: 50% 0%; }
+          50%  { transform: rotate(-22deg); transform-origin: 50% 0%; }
+          100% { transform: rotate(22deg);  transform-origin: 50% 0%; }
         }
         @keyframes hm-fall {
           0%   { transform: translateY(0)    scaleY(1)    scaleX(1);    }
@@ -1117,13 +1232,13 @@ function HamiltonMascot() {
         .hm-body { animation: hm-bob 0.55s ease-in-out infinite alternate; }
         .hm-leg-l {
           transform-box: fill-box;
-          transform-origin: top center;
-          animation: hm-leg-l-kf 0.4s ease-in-out infinite alternate;
+          transform-origin: 50% 0%;
+          animation: hm-leg-l 0.5s ease-in-out infinite;
         }
         .hm-leg-r {
           transform-box: fill-box;
-          transform-origin: top center;
-          animation: hm-leg-r-kf 0.4s ease-in-out infinite alternate;
+          transform-origin: 50% 0%;
+          animation: hm-leg-r 0.5s ease-in-out infinite;
         }
         .hm-anim-fall { animation: hm-fall 0.35s ease-in forwards !important; }
         .hm-anim-rise { animation: hm-rise 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards !important; }
@@ -1203,8 +1318,8 @@ function HamiltonMascot() {
               style={{ width: 52, height: 'auto', display: 'block', transform: facingLeft ? 'scaleX(1)' : 'scaleX(-1)' }}
             />
             <svg width="28" height="18" viewBox="0 0 28 18" style={{ display: 'block' }}>
-              <rect x="7" y="0" width="5" height="16" rx="2.5" fill="hsl(122,47%,38%)" className="hm-leg-l" />
-              <rect x="16" y="0" width="5" height="16" rx="2.5" fill="hsl(122,47%,38%)" className="hm-leg-r" />
+              <rect x="7" y="0" width="5" height="18" rx="2" fill="hsl(122,47%,38%)" className="hm-leg-l" />
+              <rect x="16" y="0" width="5" height="18" rx="2" fill="hsl(122,47%,38%)" className="hm-leg-r" />
             </svg>
           </div>
         </div>

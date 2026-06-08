@@ -60,3 +60,12 @@ svg *:focus {
 .photo-card-in {
   animation: cardSlideIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+@keyframes hamilton-wiggle {
+  0%   { transform: rotate(0deg);   }
+  20%  { transform: rotate(-12deg); }
+  40%  { transform: rotate(12deg);  }
+  60%  { transform: rotate(-8deg);  }
+  80%  { transform: rotate(8deg);   }
+  100% { transform: rotate(0deg);   }
+}

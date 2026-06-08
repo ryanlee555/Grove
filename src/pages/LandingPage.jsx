@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import hamiltonIcon from '../assets/hamilton-icon.png'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts'
 import LeafIcon from '../components/LeafIcon'
 import ArcSlider from '../components/ArcSlider'
@@ -920,395 +920,11 @@ function BudgetsFeatureSection() {
   )
 }
 
-// ─── Hamilton Mascot ──────────────────────────────────────────────────────────
-const HAMILTON_QUIPS = [
-  '"You spent $82 at Noodle Dynasty on a Tuesday. Respect."',
-  '"Three Chipotle visits this week. I\'m not judging. I\'m just saying."',
-  '"Your subscriptions cost more than your groceries. We need to talk."',
-  '"You saved 18% last month. Hamilton approves."',
-]
-
-const MASCOT_W = 52   // image width
-const MASCOT_H = 72   // approximate full height including legs
-const MASCOT_CX = 26  // horizontal center offset from posX
-
-function HamiltonMascot() {
-  const navigate = useNavigate()
-  const [posX, setPosX] = useState(0)
-  const [posY, setPosY] = useState(0)
-  const [facingLeft, setFacingLeft] = useState(false)
-  const [scrollAnim, setScrollAnim] = useState('')
-  const [showPopover, setShowPopover] = useState(false)
-  const [dragging, setDragging] = useState(false)
-  const [quip] = useState(() => HAMILTON_QUIPS[Math.floor(Math.random() * HAMILTON_QUIPS.length)])
-
-  const dirRef = useRef(1)
-  const isDragging = useRef(false)
-  const dragOffsetX = useRef(0)
-  const mouseMoved = useRef(false)
-  const mouseDownXRef = useRef(0)
-  const mouseDownYRef = useRef(0)
-  const lastScrollY = useRef(0)
-  const scrollTimer = useRef(null)
-  const scrollT1 = useRef(null)
-  const scrollT2 = useRef(null)
-  const wrapperRef = useRef(null)
-  const popoverRef = useRef(null)
-
-  // Physics refs — source of truth; state is derived for rendering only
-  const posXRef = useRef(0)
-  const posYRef = useRef(0)
-  const prevPosY = useRef(0)
-  const velY = useRef(0)
-  const isGrounded = useRef(false)
-  const currentPlatform = useRef(null)  // { el, left, right, top }
-  const platformsRef = useRef([])
-  const platformScrollTimer = useRef(null)
-
-  const getPlatforms = useCallback(() => {
-    const selectors = ['button', 'a[href]', 'nav', '[class*="rounded"]', 'section', 'footer', 'h1', 'h2', 'h3', 'p']
-    const seen = new Set()
-    const platforms = []
-    selectors.forEach(sel => {
-      document.querySelectorAll(sel).forEach(el => {
-        if (seen.has(el)) return
-        seen.add(el)
-        if (el.offsetParent === null) return
-        const r = el.getBoundingClientRect()
-        if (r.height < 20 || r.width < 40) return
-        if (r.top > window.innerHeight || r.top < 40) return
-        platforms.push({ el, left: r.left, right: r.right, top: r.top, bottom: r.bottom })
-      })
-    })
-    platformsRef.current = platforms
-  }, [])
-
-  // Init positions + spawn on highest platform in bottom 40% of viewport
-  useEffect(() => {
-    posXRef.current = window.innerWidth * 0.12
-    setPosX(posXRef.current)
-    lastScrollY.current = window.scrollY
-
-    const spawnOnPlatform = () => {
-      getPlatforms()
-      const vh = window.innerHeight
-      const candidates = platformsRef.current
-        .filter(p => p.top >= vh * 0.6 && p.top < vh - 10)
-        .sort((a, b) => a.top - b.top)
-      const spawn = candidates[0]
-      posYRef.current = spawn ? spawn.top - MASCOT_H : vh - 52
-      isGrounded.current = true
-      currentPlatform.current = spawn || null
-      prevPosY.current = posYRef.current
-      setPosY(posYRef.current)
-    }
-    setTimeout(spawnOnPlatform, 600)
-
-    const onResize = () => {
-      getPlatforms()
-      if (!isDragging.current && isGrounded.current && !currentPlatform.current) {
-        posYRef.current = window.innerHeight - 52
-        setPosY(posYRef.current)
-      }
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [getPlatforms])
-
-  // Recalc platforms on scroll (throttled 150ms)
-  useEffect(() => {
-    const onScroll = () => {
-      if (platformScrollTimer.current) clearTimeout(platformScrollTimer.current)
-      platformScrollTimer.current = setTimeout(getPlatforms, 150)
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [getPlatforms])
-
-  // Walk + physics at 32ms
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (isDragging.current) return
-
-      // X movement
-      let nextX = posXRef.current + dirRef.current * 0.6
-      if (nextX < -80 && dirRef.current < 0) {
-        dirRef.current = 1
-        setFacingLeft(false)
-      } else if (nextX > window.innerWidth + 20 && dirRef.current > 0) {
-        dirRef.current = -1
-        setFacingLeft(true)
-      }
-      posXRef.current = nextX
-      const cx = posXRef.current + MASCOT_W / 2
-      const floor = window.innerHeight - 52
-
-      // Platform proximity detection
-      const onPlatform = platformsRef.current.find(p =>
-        cx > p.left + 4 && cx < p.right - 4 &&
-        Math.abs((posYRef.current + MASCOT_H) - p.top) < 8
-      )
-
-      if (onPlatform) {
-        posYRef.current = onPlatform.top - MASCOT_H
-        velY.current = 0
-        isGrounded.current = true
-        currentPlatform.current = onPlatform
-        // Walked off edge
-        if (cx < onPlatform.left + 6 || cx > onPlatform.right - 6) {
-          isGrounded.current = false
-          currentPlatform.current = null
-        }
-      } else if (!isGrounded.current) {
-        velY.current = Math.min(velY.current + 0.45, 16)
-        const next = posYRef.current + velY.current
-        if (next >= floor) {
-          posYRef.current = floor
-          velY.current = 0
-          isGrounded.current = true
-          currentPlatform.current = null
-        } else {
-          posYRef.current = next
-        }
-      } else {
-        // Grounded but no platform beneath — start falling if not at floor
-        if (posYRef.current < floor - 4) {
-          isGrounded.current = false
-        }
-      }
-
-      setPosX(posXRef.current)
-      setPosY(posYRef.current)
-    }, 32)
-    return () => clearInterval(id)
-  }, [])
-
-  // Scroll animation (debounced 100ms)
-  useEffect(() => {
-    const onScroll = () => {
-      if (isDragging.current) return
-      const delta = window.scrollY - lastScrollY.current
-      lastScrollY.current = window.scrollY
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
-      scrollTimer.current = setTimeout(() => {
-        if (delta > 0) {
-          setScrollAnim('fall')
-          if (scrollT1.current) clearTimeout(scrollT1.current)
-          if (scrollT2.current) clearTimeout(scrollT2.current)
-          scrollT1.current = setTimeout(() => setScrollAnim('rise'), 500)
-          scrollT2.current = setTimeout(() => setScrollAnim(''), 950)
-        } else if (delta < 0) {
-          setScrollAnim('rise')
-          if (scrollT1.current) clearTimeout(scrollT1.current)
-          scrollT1.current = setTimeout(() => setScrollAnim(''), 450)
-        }
-      }, 100)
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  // Window mousemove / mouseup
-  useEffect(() => {
-    const onMove = (e) => {
-      const dx = e.clientX - mouseDownXRef.current
-      const dy = e.clientY - mouseDownYRef.current
-      if (Math.sqrt(dx * dx + dy * dy) > 5) mouseMoved.current = true
-      if (isDragging.current) {
-        posXRef.current = e.clientX - dragOffsetX.current
-        posYRef.current = e.clientY - 40
-        setPosX(posXRef.current)
-        setPosY(posYRef.current)
-      }
-    }
-    const onUp = () => {
-      if (!isDragging.current) return
-      isDragging.current = false
-      setDragging(false)
-      // Physics tick takes over — just release into freefall
-      isGrounded.current = false
-      velY.current = 0
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [])
-
-  // Close popover on outside mousedown
-  useEffect(() => {
-    if (!showPopover) return
-    const onDocMD = (e) => {
-      const inWrapper = wrapperRef.current && wrapperRef.current.contains(e.target)
-      const inPopover = popoverRef.current && popoverRef.current.contains(e.target)
-      if (!inWrapper && !inPopover) setShowPopover(false)
-    }
-    document.addEventListener('mousedown', onDocMD)
-    return () => document.removeEventListener('mousedown', onDocMD)
-  }, [showPopover])
-
-  const handleMouseDown = (e) => {
-    if (e.button !== 0) return
-    e.preventDefault()
-    isDragging.current = true
-    isGrounded.current = false
-    velY.current = 0
-    setDragging(true)
-    dragOffsetX.current = e.clientX - posXRef.current
-    mouseDownXRef.current = e.clientX
-    mouseDownYRef.current = e.clientY
-    mouseMoved.current = false
-  }
-
-  const handleClick = () => {
-    if (!mouseMoved.current) setShowPopover(p => !p)
-  }
-
-  const wrapperClass =
-    scrollAnim === 'fall' ? 'hm-anim-fall' :
-    scrollAnim === 'rise' ? 'hm-anim-rise' :
-    scrollAnim === 'land' ? 'hm-anim-land' : ''
-
-  return (
-    <>
-      <style>{`
-        @keyframes hm-bob {
-          0%   { transform: translateY(0px)  rotate(-0.8deg); }
-          25%  { transform: translateY(-3px) rotate(0deg);    }
-          50%  { transform: translateY(0px)  rotate(0.8deg);  }
-          75%  { transform: translateY(-3px) rotate(0deg);    }
-          100% { transform: translateY(0px)  rotate(-0.8deg); }
-        }
-        @keyframes hm-leg-l {
-          0%   { transform: rotate(-20deg) scaleY(1);   }
-          25%  { transform: rotate(-8deg)  scaleY(0.88); }
-          50%  { transform: rotate(20deg)  scaleY(1);   }
-          75%  { transform: rotate(8deg)   scaleY(0.88); }
-          100% { transform: rotate(-20deg) scaleY(1);   }
-        }
-        @keyframes hm-leg-r {
-          0%   { transform: rotate(20deg)  scaleY(1);   }
-          25%  { transform: rotate(8deg)   scaleY(0.88); }
-          50%  { transform: rotate(-20deg) scaleY(1);   }
-          75%  { transform: rotate(-8deg)  scaleY(0.88); }
-          100% { transform: rotate(20deg)  scaleY(1);   }
-        }
-        @keyframes hm-fall {
-          0%   { transform: translateY(0)    scaleY(1)    scaleX(1);    }
-          80%  { transform: translateY(90px) scaleY(1)    scaleX(1);    }
-          100% { transform: translateY(90px) scaleY(0.7)  scaleX(1.25); }
-        }
-        @keyframes hm-rise {
-          0%   { transform: translateY(90px) scaleY(0.7)  scaleX(1.25); }
-          60%  { transform: translateY(-8px) scaleY(1.08) scaleX(0.96); }
-          100% { transform: translateY(0)    scaleY(1)    scaleX(1);    }
-        }
-        @keyframes hm-land {
-          0%   { transform: scaleY(0.7) scaleX(1.25); }
-          100% { transform: scaleY(1)   scaleX(1);    }
-        }
-        .hm-body { animation: hm-bob 0.5s ease-in-out infinite; }
-        .hm-leg-l { animation: hm-leg-l 0.5s ease-in-out infinite; }
-        .hm-leg-r { animation: hm-leg-r 0.5s ease-in-out infinite; }
-        .hm-anim-fall { animation: hm-fall 0.35s ease-in forwards !important; }
-        .hm-anim-rise { animation: hm-rise 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards !important; }
-        .hm-anim-land { animation: hm-land 0.25s ease-out forwards !important; }
-      `}</style>
-
-      {showPopover && (
-        <div
-          ref={popoverRef}
-          style={{ position: 'fixed', left: posX - 79, top: posY - 160, zIndex: 201, fontFamily: "'DM Sans', sans-serif" }}
-        >
-          <div style={{
-            backgroundColor: 'var(--color-bg-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 14,
-            padding: '12px 16px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
-            width: 210,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 14 }}>💵</span>
-              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: 'var(--color-fg)' }}>
-                Hamilton AI
-              </span>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--color-muted-text)', marginTop: 2, marginBottom: 0 }}>
-              Your AI finance advisor
-            </p>
-            <div style={{ height: 1, backgroundColor: 'var(--color-border)', marginTop: 8, marginBottom: 8 }} />
-            <p style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--color-muted-text)', lineHeight: 1.5, margin: 0 }}>
-              {quip}
-            </p>
-            <span
-              onClick={() => navigate('/login')}
-              style={{
-                display: 'inline-block',
-                backgroundColor: 'hsl(145,38%,90%)',
-                color: 'hsl(145,38%,28%)',
-                fontSize: 11,
-                fontWeight: 600,
-                borderRadius: 999,
-                padding: '4px 10px',
-                marginTop: 8,
-                cursor: 'pointer',
-              }}
-            >
-              Available in Grove →
-            </span>
-          </div>
-          {/* Downward caret */}
-          <div style={{ width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '7px solid var(--color-border)', margin: '0 auto' }} />
-          <div style={{ width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '7px solid var(--color-bg-card)', margin: '0 auto', marginTop: -6 }} />
-        </div>
-      )}
-
-      <div
-        ref={wrapperRef}
-        className={wrapperClass}
-        onMouseDown={handleMouseDown}
-        onClick={handleClick}
-        style={{
-          position: 'fixed',
-          top: posY,
-          left: posX,
-          zIndex: 200,
-          cursor: dragging ? 'grabbing' : 'grab',
-          userSelect: 'none',
-          width: 'fit-content',
-        }}
-      >
-        <div className="hm-body">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <img
-              src={hamiltonIcon}
-              alt=""
-              draggable={false}
-              style={{ width: 52, height: 'auto', display: 'block', transform: facingLeft ? 'scaleX(1)' : 'scaleX(-1)' }}
-            />
-            <svg width="36" height="22" viewBox="0 0 36 22" style={{ display: 'block', margin: '0 auto' }}>
-              <g className="hm-leg-l" style={{ transformOrigin: '10px 0px' }}>
-                <path d="M10 0 Q8 8 6 13 Q4 18 8 20 Q12 22 13 18"
-                      stroke="hsl(122,47%,38%)" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-              </g>
-              <g className="hm-leg-r" style={{ transformOrigin: '26px 0px' }}>
-                <path d="M26 0 Q28 8 30 13 Q32 18 28 20 Q24 22 23 18"
-                      stroke="hsl(122,47%,38%)" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-              </g>
-            </svg>
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
-
 // ─── Main landing page ────────────────────────────────────────────────────────
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
+  const [showHamiltonTip, setShowHamiltonTip] = useState(false)
+  const [hamiltonHovered, setHamiltonHovered] = useState(false)
 
   const NAV_LINKS = [
     { label: 'Features',     href: '#features'        },
@@ -1398,6 +1014,45 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <div style={{ position: 'relative' }}
+              onMouseEnter={() => setShowHamiltonTip(true)}
+              onMouseLeave={() => setShowHamiltonTip(false)}
+            >
+              <img
+                src={hamiltonIcon}
+                alt="Hamilton AI"
+                style={{
+                  width: 28,
+                  height: 28,
+                  objectFit: 'contain',
+                  cursor: 'pointer',
+                  animation: hamiltonHovered ? 'hamilton-wiggle 0.5s ease-in-out' : 'none',
+                }}
+                onMouseEnter={() => setHamiltonHovered(true)}
+                onMouseLeave={() => setHamiltonHovered(false)}
+              />
+              {showHamiltonTip && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: 8,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  pointerEvents: 'none',
+                  zIndex: 50,
+                  backgroundColor: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-fg)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                }}>
+                  Hamilton AI
+                </div>
+              )}
+            </div>
             <Link to="/login"
               className="text-[14px] transition-opacity hover:opacity-60"
               style={{ color: 'var(--color-fg)', fontFamily: "'DM Sans', sans-serif", textDecoration: 'none' }}>
@@ -1583,7 +1238,6 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <HamiltonMascot />
     </div>
   )
 }

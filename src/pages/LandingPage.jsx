@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import hamiltonIcon from '../assets/hamilton-icon.png'
 import { Link, useNavigate } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts'
 import LeafIcon from '../components/LeafIcon'
@@ -929,97 +930,111 @@ const HAMILTON_QUIPS = [
 
 function HamiltonMascot() {
   const navigate = useNavigate()
-  const [pos, setPos] = useState(() => ({
-    x: window.innerWidth * 0.15,
-    y: window.innerHeight - 90,
-  }))
-  const [dragging, setDragging] = useState(false)
-  const [hovered, setHovered] = useState(false)
-  const [scrollAnim, setScrollAnim] = useState('idle')
+  const [posX, setPosX] = useState(0)
+  const [posY, setPosY] = useState(0)
+  const [facingLeft, setFacingLeft] = useState(false)
+  const [scrollAnim, setScrollAnim] = useState('')
   const [showPopover, setShowPopover] = useState(false)
-  const [releasing, setReleasing] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [transitionActive, setTransitionActive] = useState(false)
   const [quip] = useState(() => HAMILTON_QUIPS[Math.floor(Math.random() * HAMILTON_QUIPS.length)])
 
-  const draggingRef = useRef(false)
-  const dragOffsetRef = useRef({ x: 0, y: 0 })
-  const mouseDownPosRef = useRef({ x: 0, y: 0 })
-  const hasDraggedRef = useRef(false)
-  const lastScrollY = useRef(window.scrollY)
-  const scrollTimerRef = useRef(null)
-  const animInProgressRef = useRef(false)
-  const pendingScrollDir = useRef(0)
-  const mascotRef = useRef(null)
-  const posRef = useRef(pos)
-  posRef.current = pos
+  const dirRef = useRef(1)
+  const isDragging = useRef(false)
+  const dragOffsetX = useRef(0)
+  const mouseMoved = useRef(false)
+  const mouseDownXRef = useRef(0)
+  const mouseDownYRef = useRef(0)
+  const lastScrollY = useRef(0)
+  const scrollTimer = useRef(null)
+  const scrollT1 = useRef(null)
+  const scrollT2 = useRef(null)
+  const wrapperRef = useRef(null)
+  const popoverRef = useRef(null)
 
-  // Scroll animation
+  // Init positions client-side and track resize
+  useEffect(() => {
+    setPosX(window.innerWidth * 0.12)
+    setPosY(window.innerHeight - 88)
+    lastScrollY.current = window.scrollY
+    const onResize = () => { if (!isDragging.current) setPosY(window.innerHeight - 88) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // Walk at 16ms
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (isDragging.current) return
+      setPosX(prev => {
+        const next = prev + dirRef.current * 1.2
+        if (next < -80 && dirRef.current < 0) {
+          dirRef.current = 1
+          setFacingLeft(false)
+        } else if (next > window.innerWidth + 20 && dirRef.current > 0) {
+          dirRef.current = -1
+          setFacingLeft(true)
+        }
+        return next
+      })
+    }, 16)
+    return () => clearInterval(id)
+  }, [])
+
+  // Random direction flip every ~3–7 s
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!isDragging.current) {
+        dirRef.current = Math.random() > 0.5 ? 1 : -1
+        setFacingLeft(dirRef.current === -1)
+      }
+    }, 5000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Scroll animation (debounced 100ms)
   useEffect(() => {
     const onScroll = () => {
-      if (draggingRef.current) return
-      const currentY = window.scrollY
-      const delta = currentY - lastScrollY.current
-      lastScrollY.current = currentY
-      if (delta === 0) return
-      pendingScrollDir.current = delta > 0 ? 1 : -1
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-      if (animInProgressRef.current) return
-      scrollTimerRef.current = setTimeout(() => {
-        if (animInProgressRef.current) return
-        animInProgressRef.current = true
-        const dir = pendingScrollDir.current
-        if (dir > 0) {
+      if (isDragging.current) return
+      const delta = window.scrollY - lastScrollY.current
+      lastScrollY.current = window.scrollY
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
+      scrollTimer.current = setTimeout(() => {
+        if (delta > 0) {
           setScrollAnim('fall')
-          setTimeout(() => {
-            setScrollAnim('land')
-            setTimeout(() => {
-              setScrollAnim('idle')
-              animInProgressRef.current = false
-            }, 200)
-          }, 350)
-        } else {
+          if (scrollT1.current) clearTimeout(scrollT1.current)
+          if (scrollT2.current) clearTimeout(scrollT2.current)
+          scrollT1.current = setTimeout(() => setScrollAnim('rise'), 500)
+          scrollT2.current = setTimeout(() => setScrollAnim(''), 950)
+        } else if (delta < 0) {
           setScrollAnim('rise')
-          setTimeout(() => {
-            setScrollAnim('idle')
-            animInProgressRef.current = false
-          }, 400)
+          if (scrollT1.current) clearTimeout(scrollT1.current)
+          scrollT1.current = setTimeout(() => setScrollAnim(''), 450)
         }
-      }, 120)
+      }, 100)
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Drag events
-  const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return
-    e.preventDefault()
-    draggingRef.current = true
-    dragOffsetRef.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }
-    mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
-    hasDraggedRef.current = false
-    setDragging(true)
-    setReleasing(false)
-  }, [])
-
+  // Window mousemove / mouseup
   useEffect(() => {
     const onMove = (e) => {
-      if (!draggingRef.current) return
-      const dx = e.clientX - mouseDownPosRef.current.x
-      const dy = e.clientY - mouseDownPosRef.current.y
-      if (Math.sqrt(dx * dx + dy * dy) > 5) hasDraggedRef.current = true
-      setPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y })
+      const dx = e.clientX - mouseDownXRef.current
+      const dy = e.clientY - mouseDownYRef.current
+      if (Math.sqrt(dx * dx + dy * dy) > 5) mouseMoved.current = true
+      if (isDragging.current) {
+        setPosX(e.clientX - dragOffsetX.current)
+        setPosY(e.clientY - 40)
+      }
     }
     const onUp = () => {
-      if (!draggingRef.current) return
-      draggingRef.current = false
+      if (!isDragging.current) return
+      isDragging.current = false
       setDragging(false)
-      if (!hasDraggedRef.current) {
-        setShowPopover(p => !p)
-      } else {
-        setReleasing(true)
-        setPos(p => ({ x: p.x, y: window.innerHeight - 90 }))
-        setTimeout(() => setReleasing(false), 450)
-      }
+      setTransitionActive(true)
+      setPosY(window.innerHeight - 88)
+      setTimeout(() => setTransitionActive(false), 450)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -1029,110 +1044,100 @@ function HamiltonMascot() {
     }
   }, [])
 
-  // Close popover on outside click
+  // Close popover on outside mousedown
   useEffect(() => {
     if (!showPopover) return
-    const onDocClick = (e) => {
-      if (mascotRef.current && !mascotRef.current.contains(e.target)) {
-        setShowPopover(false)
-      }
+    const onDocMD = (e) => {
+      const inWrapper = wrapperRef.current && wrapperRef.current.contains(e.target)
+      const inPopover = popoverRef.current && popoverRef.current.contains(e.target)
+      if (!inWrapper && !inPopover) setShowPopover(false)
     }
-    document.addEventListener('click', onDocClick)
-    return () => document.removeEventListener('click', onDocClick)
+    document.addEventListener('mousedown', onDocMD)
+    return () => document.removeEventListener('mousedown', onDocMD)
   }, [showPopover])
 
-  const animClass =
-    scrollAnim === 'fall' ? 'hm-fall' :
-    scrollAnim === 'land' ? 'hm-land' :
-    scrollAnim === 'rise' ? 'hm-rise' :
-    'hm-walk'
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    isDragging.current = true
+    setDragging(true)
+    dragOffsetX.current = e.clientX - posX
+    mouseDownXRef.current = e.clientX
+    mouseDownYRef.current = e.clientY
+    mouseMoved.current = false
+    setTransitionActive(false)
+  }
+
+  const handleClick = () => {
+    if (!mouseMoved.current) setShowPopover(p => !p)
+  }
+
+  const wrapperClass = scrollAnim === 'fall' ? 'hm-anim-fall' : scrollAnim === 'rise' ? 'hm-anim-rise' : ''
 
   return (
     <>
       <style>{`
-        @keyframes hm-walk {
-          0%   { transform: translateX(-2px) translateY(0px)  rotate(-1deg); }
-          100% { transform: translateX(2px)  translateY(-2px) rotate(1deg);  }
+        @keyframes hm-bob {
+          0%   { transform: translateY(0px)  rotate(-1deg); }
+          100% { transform: translateY(-4px) rotate(1deg);  }
+        }
+        @keyframes hm-leg-l-kf {
+          0%   { transform: rotate(-18deg); }
+          100% { transform: rotate(8deg);   }
+        }
+        @keyframes hm-leg-r-kf {
+          0%   { transform: rotate(8deg);   }
+          100% { transform: rotate(-18deg); }
         }
         @keyframes hm-fall {
-          from { transform: translateY(0);     }
-          to   { transform: translateY(120px); }
+          0%   { transform: translateY(0)    scaleY(1)    scaleX(1);    }
+          80%  { transform: translateY(90px) scaleY(1)    scaleX(1);    }
+          100% { transform: translateY(90px) scaleY(0.7)  scaleX(1.25); }
         }
         @keyframes hm-rise {
-          from { transform: translateY(120px); }
-          to   { transform: translateY(0);     }
+          0%   { transform: translateY(90px) scaleY(0.7)  scaleX(1.25); }
+          60%  { transform: translateY(-8px) scaleY(1.08) scaleX(0.96); }
+          100% { transform: translateY(0)    scaleY(1)    scaleX(1);    }
         }
-        @keyframes hm-land {
-          from { transform: scaleY(0.7) scaleX(1.2); }
-          to   { transform: scaleY(1)   scaleX(1);   }
-        }
-        @keyframes hm-legs-l {
-          from { transform: rotate(-15deg); }
-          to   { transform: rotate(15deg);  }
-        }
-        @keyframes hm-legs-r {
-          from { transform: rotate(15deg);  }
-          to   { transform: rotate(-15deg); }
-        }
-        .hm-walk { animation: hm-walk 0.6s infinite alternate ease-in-out; }
-        .hm-fall { animation: hm-fall 0.35s ease-in forwards; }
-        .hm-rise { animation: hm-rise 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-        .hm-land { animation: hm-land 0.25s ease-out forwards; }
+        .hm-body { animation: hm-bob 0.55s ease-in-out infinite alternate; }
         .hm-leg-l {
           transform-box: fill-box;
-          transform-origin: 50% 0%;
-          animation: hm-legs-l 0.6s infinite alternate ease-in-out;
+          transform-origin: top center;
+          animation: hm-leg-l-kf 0.4s ease-in-out infinite alternate;
         }
         .hm-leg-r {
           transform-box: fill-box;
-          transform-origin: 50% 0%;
-          animation: hm-legs-r 0.6s infinite alternate ease-in-out;
+          transform-origin: top center;
+          animation: hm-leg-r-kf 0.4s ease-in-out infinite alternate;
         }
+        .hm-anim-fall { animation: hm-fall 0.35s ease-in forwards !important; }
+        .hm-anim-rise { animation: hm-rise 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards !important; }
       `}</style>
 
-      <div
-        ref={mascotRef}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onMouseDown={handleMouseDown}
-        style={{
-          position: 'fixed',
-          top: pos.y,
-          left: pos.x,
-          zIndex: 200,
-          cursor: dragging ? 'grabbing' : 'grab',
-          userSelect: 'none',
-          transition: releasing ? 'top 400ms cubic-bezier(0.34,1.56,0.64,1)' : 'none',
-        }}
-      >
-        {showPopover && (
-          <div
-            onMouseDown={e => e.stopPropagation()}
-            style={{
-              position: 'absolute',
-              bottom: 'calc(100% + 10px)',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              backgroundColor: 'var(--color-bg-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 14,
-              padding: '12px 16px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
-              width: 220,
-              zIndex: 201,
-            }}
-          >
+      {showPopover && (
+        <div
+          ref={popoverRef}
+          style={{ position: 'fixed', left: posX - 79, top: posY - 160, zIndex: 201, fontFamily: "'DM Sans', sans-serif" }}
+        >
+          <div style={{
+            backgroundColor: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 14,
+            padding: '12px 16px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+            width: 210,
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 14 }}>💵</span>
               <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: 'var(--color-fg)' }}>
                 Hamilton AI
               </span>
             </div>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: 'var(--color-muted-text)', marginTop: 2, marginBottom: 0 }}>
+            <p style={{ fontSize: 12, color: 'var(--color-muted-text)', marginTop: 2, marginBottom: 0 }}>
               Your AI finance advisor
             </p>
-            <div style={{ height: 1, backgroundColor: 'var(--color-border)', margin: '8px 0' }} />
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontStyle: 'italic', color: 'var(--color-muted-text)', lineHeight: 1.5, margin: 0 }}>
+            <div style={{ height: 1, backgroundColor: 'var(--color-border)', marginTop: 8, marginBottom: 8 }} />
+            <p style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--color-muted-text)', lineHeight: 1.5, margin: 0 }}>
               {quip}
             </p>
             <span
@@ -1147,41 +1152,44 @@ function HamiltonMascot() {
                 padding: '4px 10px',
                 marginTop: 8,
                 cursor: 'pointer',
-                fontFamily: "'DM Sans', sans-serif",
               }}
             >
               Available in Grove →
             </span>
           </div>
-        )}
+          {/* Downward caret */}
+          <div style={{ width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '7px solid var(--color-border)', margin: '0 auto' }} />
+          <div style={{ width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '7px solid var(--color-bg-card)', margin: '0 auto', marginTop: -6 }} />
+        </div>
+      )}
 
-        <div
-          style={{
-            transform: dragging ? 'scale(1.1)' : hovered ? 'scale(1.08)' : 'scale(1)',
-            filter: dragging ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.25))' : 'none',
-            transition: dragging ? 'none' : 'transform 150ms ease',
-          }}
-        >
-          <div className={animClass}>
-            <svg width="64" height="72" viewBox="0 0 64 72" fill="none">
-              {/* Legs drawn first so the bill covers their tops */}
-              <rect className="hm-leg-l" x="17" y="44" width="11" height="28" rx="5.5" fill="hsl(145,38%,26%)" />
-              <rect className="hm-leg-r" x="36" y="44" width="11" height="28" rx="5.5" fill="hsl(145,38%,26%)" />
-              {/* Bill body */}
-              <rect width="64" height="52" rx="8" fill="hsl(145,38%,34%)" />
-              {/* Inner border inset 3px */}
-              <rect x="3" y="3" width="58" height="46" rx="6" fill="none" stroke="hsl(140,30%,75%)" strokeWidth="1.5" />
-              {/* $ label */}
-              <text x="32" y="13" textAnchor="middle" fill="white" fontSize="9" fontWeight="bold" fontFamily="monospace">$</text>
-              {/* Face oval */}
-              <ellipse cx="32" cy="29" rx="17" ry="12" fill="white" />
-              {/* Eyes */}
-              <circle cx="26" cy="26" r="2" fill="hsl(145,45%,18%)" />
-              <circle cx="38" cy="26" r="2" fill="hsl(145,45%,18%)" />
-              {/* Smile */}
-              <path d="M27 32 Q32 37 37 32" stroke="hsl(145,45%,18%)" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-            </svg>
-          </div>
+      <div
+        ref={wrapperRef}
+        className={wrapperClass}
+        onMouseDown={handleMouseDown}
+        onClick={handleClick}
+        style={{
+          position: 'fixed',
+          top: posY,
+          left: posX,
+          zIndex: 200,
+          cursor: dragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          width: 'fit-content',
+          transition: transitionActive ? 'top 0.4s cubic-bezier(0.34,1.56,0.64,1)' : 'none',
+        }}
+      >
+        <div className="hm-body">
+          <img
+            src={hamiltonIcon}
+            alt=""
+            draggable={false}
+            style={{ width: 52, height: 'auto', display: 'block', transform: facingLeft ? 'scaleX(-1)' : 'scaleX(1)' }}
+          />
+          <svg width="28" height="18" viewBox="0 0 28 18" style={{ display: 'block' }}>
+            <rect x="7" y="0" width="5" height="16" rx="2.5" fill="hsl(145,38%,28%)" className="hm-leg-l" />
+            <rect x="16" y="0" width="5" height="16" rx="2.5" fill="hsl(145,38%,28%)" className="hm-leg-r" />
+          </svg>
         </div>
       </div>
     </>

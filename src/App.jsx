@@ -2080,11 +2080,12 @@ Use all this data to answer questions accurately. If asked about a specific time
                 <p className="text-[11px] mb-2.5" style={{ color: 'var(--color-muted-text)' }}>Choose how Hamilton communicates with you.</p>
                 <div className="flex flex-col gap-2">
                   {[
-                    { id: 'default',  name: 'Default',  desc: 'Balanced and friendly, like a knowledgeable friend.' },
-                    { id: 'concise',  name: 'Concise',  desc: 'Short and direct. No fluff, just the numbers.' },
-                    { id: 'detailed', name: 'Detailed', desc: 'Deep dives with full breakdowns and context.' },
-                    { id: 'hype',     name: 'Hype',     desc: 'Enthusiastic and encouraging about every win.' },
-                    { id: 'roast',    name: 'Roast',    desc: 'Brutally honest about your spending. No filter.' },
+                    { id: 'default',   name: 'Default',         desc: 'Balanced and friendly, like a knowledgeable friend.' },
+                    { id: 'concise',   name: 'Concise',         desc: 'Short and direct. No fluff, just the numbers.' },
+                    { id: 'detailed',  name: 'Detailed',        desc: 'Deep dives with full breakdowns and context.' },
+                    { id: 'hype',      name: 'Hype',            desc: 'Enthusiastic and encouraging about every win.' },
+                    { id: 'roast',     name: 'Roast',           desc: 'Brutally honest about your spending. No filter.' },
+                    { id: 'linmanuel', name: 'Lin-Manuel 🎭',   desc: 'Hamilton the musical energy — rise up, not throwing away your shot.' },
                   ].map(({ id, name, desc }) => {
                     const isSelected = settingStyle === id
                     return (

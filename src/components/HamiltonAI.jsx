@@ -38,10 +38,11 @@ function TypingIndicator() {
 }
 
 const STYLE_INSTRUCTIONS = {
-  concise:  'Keep all responses very short and to the point. No lengthy explanations.',
-  detailed: 'Give thorough, detailed responses with full context and breakdowns.',
-  hype:     'Be enthusiastic and encouraging. Celebrate wins and motivate the user.',
-  roast:    "Be brutally honest and don't sugarcoat anything about the user's spending habits. Roast them when appropriate.",
+  concise:    'Keep all responses very short and to the point. No lengthy explanations.',
+  detailed:   'Give thorough, detailed responses with full context and breakdowns.',
+  hype:       'Be enthusiastic and encouraging. Celebrate wins and motivate the user.',
+  roast:      "Be brutally honest and don't sugarcoat anything about the user's spending habits. Roast them when appropriate.",
+  linmanuel:  'linmanuel', // handled by edge function
 }
 
 export default function HamiltonAI({ isOpen, onClose, userName, displayName, hamiltonStyle, financialContext }) {
@@ -79,7 +80,8 @@ export default function HamiltonAI({ isOpen, onClose, userName, displayName, ham
         },
         body: JSON.stringify({
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
-          context: `The user's name is ${displayName || 'the user'}.${STYLE_INSTRUCTIONS[hamiltonStyle] ? ' ' + STYLE_INSTRUCTIONS[hamiltonStyle] : ''}\n\n${financialContext}`,
+          hamiltonStyle,
+          context: `The user's name is ${displayName || 'the user'}.${STYLE_INSTRUCTIONS[hamiltonStyle] && hamiltonStyle !== 'linmanuel' ? ' ' + STYLE_INSTRUCTIONS[hamiltonStyle] : ''}\n\n${financialContext}`,
         }),
       })
 
@@ -198,7 +200,10 @@ export default function HamiltonAI({ isOpen, onClose, userName, displayName, ham
                 fontSize: 13,
                 lineHeight: 1.5,
               }}>
-                Hey {displayName || userName}, how can I help you today?
+                {hamiltonStyle === 'linmanuel'
+                  ? `Rise up, ${displayName || userName}! History has its eyes on your finances. I am not throwing away this shot to help you — what can I do for you today?`
+                  : `Hey ${displayName || userName}, how can I help you today?`
+                }
               </div>
               <div style={{
                 fontSize: 10,

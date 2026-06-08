@@ -936,7 +936,6 @@ function HamiltonMascot() {
   const [scrollAnim, setScrollAnim] = useState('')
   const [showPopover, setShowPopover] = useState(false)
   const [dragging, setDragging] = useState(false)
-  const [transitionActive, setTransitionActive] = useState(false)
   const [quip] = useState(() => HAMILTON_QUIPS[Math.floor(Math.random() * HAMILTON_QUIPS.length)])
 
   const dirRef = useRef(1)
@@ -951,6 +950,8 @@ function HamiltonMascot() {
   const scrollT2 = useRef(null)
   const wrapperRef = useRef(null)
   const popoverRef = useRef(null)
+  const gravityRef = useRef(1)
+  const dropIntervalRef = useRef(null)
 
   // Init positions client-side and track resize
   useEffect(() => {
@@ -962,12 +963,12 @@ function HamiltonMascot() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // Walk at 16ms
+  // Walk at 32ms, 0.6px per tick, continuous edge-flip only
   useEffect(() => {
     const id = setInterval(() => {
       if (isDragging.current) return
       setPosX(prev => {
-        const next = prev + dirRef.current * 1.2
+        const next = prev + dirRef.current * 0.6
         if (next < -80 && dirRef.current < 0) {
           dirRef.current = 1
           setFacingLeft(false)
@@ -977,18 +978,7 @@ function HamiltonMascot() {
         }
         return next
       })
-    }, 16)
-    return () => clearInterval(id)
-  }, [])
-
-  // Random direction flip every ~3–7 s
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (!isDragging.current) {
-        dirRef.current = Math.random() > 0.5 ? 1 : -1
-        setFacingLeft(dirRef.current === -1)
-      }
-    }, 5000)
+    }, 32)
     return () => clearInterval(id)
   }, [])
 
@@ -1032,15 +1022,30 @@ function HamiltonMascot() {
       if (!isDragging.current) return
       isDragging.current = false
       setDragging(false)
-      setTransitionActive(true)
-      setPosY(window.innerHeight - 88)
-      setTimeout(() => setTransitionActive(false), 450)
+      // Gravity drop: accelerate downward until floor
+      gravityRef.current = 1
+      dropIntervalRef.current = setInterval(() => {
+        setPosY(prev => {
+          const floor = window.innerHeight - 88
+          if (prev >= floor) {
+            clearInterval(dropIntervalRef.current)
+            dropIntervalRef.current = null
+            setScrollAnim('land')
+            setTimeout(() => setScrollAnim(''), 250)
+            return floor
+          }
+          const next = prev + gravityRef.current
+          gravityRef.current += 0.4
+          return next >= floor ? floor : next
+        })
+      }, 16)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      if (dropIntervalRef.current) clearInterval(dropIntervalRef.current)
     }
   }, [])
 
@@ -1059,20 +1064,26 @@ function HamiltonMascot() {
   const handleMouseDown = (e) => {
     if (e.button !== 0) return
     e.preventDefault()
+    if (dropIntervalRef.current) {
+      clearInterval(dropIntervalRef.current)
+      dropIntervalRef.current = null
+    }
     isDragging.current = true
     setDragging(true)
     dragOffsetX.current = e.clientX - posX
     mouseDownXRef.current = e.clientX
     mouseDownYRef.current = e.clientY
     mouseMoved.current = false
-    setTransitionActive(false)
   }
 
   const handleClick = () => {
     if (!mouseMoved.current) setShowPopover(p => !p)
   }
 
-  const wrapperClass = scrollAnim === 'fall' ? 'hm-anim-fall' : scrollAnim === 'rise' ? 'hm-anim-rise' : ''
+  const wrapperClass =
+    scrollAnim === 'fall' ? 'hm-anim-fall' :
+    scrollAnim === 'rise' ? 'hm-anim-rise' :
+    scrollAnim === 'land' ? 'hm-anim-land' : ''
 
   return (
     <>
@@ -1099,6 +1110,10 @@ function HamiltonMascot() {
           60%  { transform: translateY(-8px) scaleY(1.08) scaleX(0.96); }
           100% { transform: translateY(0)    scaleY(1)    scaleX(1);    }
         }
+        @keyframes hm-land {
+          0%   { transform: scaleY(0.7) scaleX(1.25); }
+          100% { transform: scaleY(1)   scaleX(1);    }
+        }
         .hm-body { animation: hm-bob 0.55s ease-in-out infinite alternate; }
         .hm-leg-l {
           transform-box: fill-box;
@@ -1112,6 +1127,7 @@ function HamiltonMascot() {
         }
         .hm-anim-fall { animation: hm-fall 0.35s ease-in forwards !important; }
         .hm-anim-rise { animation: hm-rise 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards !important; }
+        .hm-anim-land { animation: hm-land 0.25s ease-out forwards !important; }
       `}</style>
 
       {showPopover && (
@@ -1176,20 +1192,21 @@ function HamiltonMascot() {
           cursor: dragging ? 'grabbing' : 'grab',
           userSelect: 'none',
           width: 'fit-content',
-          transition: transitionActive ? 'top 0.4s cubic-bezier(0.34,1.56,0.64,1)' : 'none',
         }}
       >
         <div className="hm-body">
-          <img
-            src={hamiltonIcon}
-            alt=""
-            draggable={false}
-            style={{ width: 52, height: 'auto', display: 'block', transform: facingLeft ? 'scaleX(-1)' : 'scaleX(1)' }}
-          />
-          <svg width="28" height="18" viewBox="0 0 28 18" style={{ display: 'block' }}>
-            <rect x="7" y="0" width="5" height="16" rx="2.5" fill="hsl(145,38%,28%)" className="hm-leg-l" />
-            <rect x="16" y="0" width="5" height="16" rx="2.5" fill="hsl(145,38%,28%)" className="hm-leg-r" />
-          </svg>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <img
+              src={hamiltonIcon}
+              alt=""
+              draggable={false}
+              style={{ width: 52, height: 'auto', display: 'block', transform: facingLeft ? 'scaleX(1)' : 'scaleX(-1)' }}
+            />
+            <svg width="28" height="18" viewBox="0 0 28 18" style={{ display: 'block' }}>
+              <rect x="7" y="0" width="5" height="16" rx="2.5" fill="hsl(122,47%,38%)" className="hm-leg-l" />
+              <rect x="16" y="0" width="5" height="16" rx="2.5" fill="hsl(122,47%,38%)" className="hm-leg-r" />
+            </svg>
+          </div>
         </div>
       </div>
     </>

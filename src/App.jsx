@@ -1302,6 +1302,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
           category: r.category,
           amount:   r.amount,
           source:   r.source,
+          isManual: true,
         }))
 
         const plaidTx = filteredTx.map(t => ({
@@ -1446,7 +1447,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       .single()
 
     if (!error && data) {
-      setAllTx(prev => [...prev, { ...newTx, id: data.id }])
+      setAllTx(prev => [...prev, { ...newTx, id: data.id, isManual: true }])
     }
 
     setShowAddModal(false)
@@ -1456,27 +1457,41 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   }
 
   const handleEditTx = async (id, updated) => {
-    setAllTx(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t))
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    console.log('user:', user, 'userError:', userError)
-    const { data, error } = await supabase.from('transaction_overrides').upsert({
-      user_id: user.id,
-      transaction_id: id,
-      category: updated.category,
-      name: updated.merchant,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id, transaction_id' })
-    console.log('upsert data:', data, 'upsert error:', error)
+    setAllTx(prev => prev.map(t => t.id === id ? { ...t, ...updated, isManual: t.isManual } : t))
+    const { data: { user } } = await supabase.auth.getUser()
+    const tx = allTx.find(t => t.id === id)
+    if (tx?.isManual) {
+      await supabase.from('manual_transactions').update({
+        merchant: updated.merchant,
+        category: updated.category,
+        amount:   updated.amount,
+        source:   updated.source,
+        date:     updated.date,
+      }).eq('id', id).eq('user_id', user.id)
+    } else {
+      await supabase.from('transaction_overrides').upsert({
+        user_id:        user.id,
+        transaction_id: id,
+        category:       updated.category,
+        name:           updated.merchant,
+        updated_at:     new Date().toISOString(),
+      }, { onConflict: 'user_id,transaction_id' })
+    }
   }
 
   const handleDeleteTx = async (id) => {
-    setAllTx(prev => prev.filter(t => t.id !== id));
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('deleted_transactions').upsert({
-      user_id: user.id,
-      transaction_id: id,
-    }, { onConflict: 'user_id,transaction_id' });
-  };
+    const tx = allTx.find(t => t.id === id)
+    setAllTx(prev => prev.filter(t => t.id !== id))
+    const { data: { user } } = await supabase.auth.getUser()
+    if (tx?.isManual) {
+      await supabase.from('manual_transactions').delete().eq('id', id).eq('user_id', user.id)
+    } else {
+      await supabase.from('deleted_transactions').upsert({
+        user_id:        user.id,
+        transaction_id: id,
+      }, { onConflict: 'user_id,transaction_id' })
+    }
+  }
 
   // ── Card settings handlers ────────────────────────────────────────────────────
   const handleRenameAccount = async (accountId, newName) => {

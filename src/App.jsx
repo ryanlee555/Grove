@@ -1395,39 +1395,33 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
   const handleSaveProfile = async () => {
     setSettingSaving(true)
-    // FIX 1: immediately show local preview in navbar while upload runs
-    if (cropPreviewUrl) {
-      setProfile(p => ({ ...p, avatar_url: cropPreviewUrl }))
-    }
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      let avatar_url = profile.avatar_url
+
+      // Determine final avatar URL — upload new file if present, otherwise keep existing
+      let dbAvatarUrl = (profile.avatar_url || '').split('?')[0]  // clean URL for DB
+      let finalAvatarUrl = profile.avatar_url || ''               // cache-busted URL for state
+
       if (settingAvatar) {
         const ext = settingAvatar.name.split('.').pop()
-        await supabase.storage.from('avatars').upload(`${user.id}.${ext}`, settingAvatar, { contentType: settingAvatar.type, upsert: true })
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${user.id}.${ext}`)
-        // Store clean URL in DB; cache-bust only in memory
-        const cleanUrl = urlData.publicUrl
-        avatar_url = `${cleanUrl}?t=${Date.now()}`
-        // FIX 2: write the new URL to user_profile before updating local state
-        await supabase.from('user_profile').upsert({
-          user_id: user.id,
-          display_name: settingName,
-          avatar_url: cleanUrl,
-          hamilton_style: settingStyle,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' })
-      } else {
-        await supabase.from('user_profile').upsert({
-          user_id: user.id,
-          display_name: settingName,
-          avatar_url: avatar_url.split('?')[0] || avatar_url,
-          hamilton_style: settingStyle,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' })
+        const filePath = `${user.id}.${ext}`
+        await supabase.storage.from('avatars').upload(filePath, settingAvatar, { contentType: settingAvatar.type, upsert: true })
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+        dbAvatarUrl   = urlData.publicUrl
+        finalAvatarUrl = `${dbAvatarUrl}?t=${Date.now()}`
       }
-      // Replace any local preview with the real public URL after all awaits complete
-      setProfile({ display_name: settingName, avatar_url, hamilton_style: settingStyle })
+
+      // Single upsert with all fields
+      await supabase.from('user_profile').upsert({
+        user_id: user.id,
+        display_name: settingName,
+        avatar_url: dbAvatarUrl,
+        hamilton_style: settingStyle,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+
+      // Update top-level state once, after all async work is done
+      setProfile({ display_name: settingName, avatar_url: finalAvatarUrl, hamilton_style: settingStyle })
       setSettingAvatar(null)
       setCropPreviewUrl(null)
       setShowSettings(false)
@@ -1802,7 +1796,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                     <p className="text-[13px] font-semibold" style={{ color: 'var(--color-fg)' }}>Pingoo</p>
                     <p className="text-[11px]" style={{ color: 'var(--color-muted-text)' }}>Personal account</p>
                   </div>
-                  <button onClick={() => { setShowSettings(true); setShowDropdown(false) }} className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
+                  <button onClick={() => { setCropPreviewUrl(profile.avatar_url || null); setShowSettings(true); setShowDropdown(false) }} className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
                     style={{ color: 'var(--color-fg)', cursor: 'pointer' }}>Settings</button>
                   <button onClick={handleSignOut} className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80" style={{ cursor: 'pointer' }}>Sign out</button>
                 </div>
@@ -2199,13 +2193,13 @@ Use all this data to answer questions accurately. If asked about a specific time
       {/* ── Settings Modal ───────────────────────────────────────────────────── */}
       {showSettings && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          onClick={e => { if (e.target === e.currentTarget) setShowSettings(false) }}>
+          onClick={e => { if (e.target === e.currentTarget) { setSettingAvatar(null); setShowSettings(false) } }}>
           <div className="w-full max-w-md mx-4 rounded-2xl border shadow-2xl flex flex-col"
             style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', maxHeight: '90vh' }}>
             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b shrink-0"
               style={{ borderColor: 'var(--color-border)' }}>
               <h2 className="text-[15px] font-semibold" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>Settings</h2>
-              <button onClick={() => setShowSettings(false)}
+              <button onClick={() => { setSettingAvatar(null); setShowSettings(false) }}
                 className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
                 style={{ color: 'var(--color-muted-text)' }}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
@@ -2305,7 +2299,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                 style={{ backgroundColor: 'var(--color-primary)', opacity: settingSaving ? 0.7 : 1, cursor: settingSaving ? 'default' : 'pointer' }}>
                 {settingSaving ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" onClick={() => setShowSettings(false)}
+              <button type="button" onClick={() => { setSettingAvatar(null); setShowSettings(false) }}
                 className="flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-colors"
                 style={{ borderColor: 'var(--color-border)', color: 'var(--color-fg)', cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}

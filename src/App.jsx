@@ -281,13 +281,13 @@ function TxEditForm({ tx, onSave, onDelete, onCancel }) {
   const [merchant, setMerchant] = useState(tx.merchant)
   const [category, setCategory] = useState(tx.category)
   const [source,   setSource]   = useState(tx.source)
-  const [amount,   setAmount]   = useState(Math.abs(tx.amount).toString())
+  const [amount,   setAmount]   = useState(tx.amount.toString())
 
   const handleSave = (e) => {
     e.preventDefault()
     const parsed = parseFloat(amount)
     if (!date || !merchant.trim() || isNaN(parsed)) return
-    onSave({ date: toTxDateStr(fromInputDate(date)), merchant: merchant.trim(), category, source, amount: -Math.abs(parsed) })
+    onSave({ date: toTxDateStr(fromInputDate(date)), merchant: merchant.trim(), category, source, amount: parsed })
   }
 
   return (
@@ -301,11 +301,41 @@ function TxEditForm({ tx, onSave, onDelete, onCancel }) {
         <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls} style={inputStyle}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={source} onChange={e => setSource(e.target.value)} className={inputCls} style={inputStyle}>
-          {CARD_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {CARD_OPTIONS.map(opt => {
+            const isUnlimited = opt.includes('Unlimited')
+            const isFlex = opt.includes('Flex')
+            const label = isUnlimited ? 'Unlimited' : isFlex ? 'Flex' : 'Other'
+            const bg = opt === source
+              ? (isFlex ? 'hsl(145,22%,82%)' : isUnlimited ? 'hsl(145,28%,72%)' : 'hsl(25,40%,82%)')
+              : 'var(--color-muted-bg)'
+            const color = opt === source
+              ? (isFlex ? 'hsl(145,38%,24%)' : isUnlimited ? 'hsl(145,38%,20%)' : 'hsl(25,55%,35%)')
+              : 'var(--color-muted-text)'
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setSource(opt)}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 999,
+                  border: 'none',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  backgroundColor: bg,
+                  color,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
         <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
-          placeholder="Amount" step="0.01" min="0" className={inputCls} style={inputStyle} />
+          placeholder="Amount" step="0.01" className={inputCls} style={inputStyle} />
       </div>
       <div className="flex items-center gap-2">
         <button type="submit"
@@ -1393,7 +1423,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       date:     toTxDateStr(fromInputDate(formDate)),
       merchant: formMerchant.trim(),
       category: formCategory,
-      amount:   -Math.abs(parseFloat(formAmount)),
+      amount:   parseFloat(formAmount),
       source:   formPayment,
     }
 
@@ -2233,7 +2263,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Amount ($)</label>
-                  <input type="number" required min="0.01" step="0.01" placeholder="0.00"
+                  <input type="number" required step="0.01" placeholder="0.00"
                     value={formAmount} onChange={e => setFormAmount(e.target.value)} className={inputCls} style={inputStyle} />
                 </div>
               </div>
@@ -2262,7 +2292,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                   style={{ backgroundColor: 'var(--color-muted-bg)' }}>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[formCategory] }} />
                   <span className="text-[11px]" style={{ color: 'var(--color-fg)' }}>
-                    {formMerchant || 'Merchant'} · {formCategory}{formAmount ? ` · -$${parseFloat(formAmount||0).toFixed(2)}` : ''}
+                    {formMerchant || 'Merchant'} · {formCategory}{formAmount ? ` · ${parseFloat(formAmount||0) >= 0 ? '+' : '-'}$${Math.abs(parseFloat(formAmount||0)).toFixed(2)}` : ''}
                   </span>
                 </div>
               )}

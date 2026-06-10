@@ -553,12 +553,13 @@ function TrendsSection({ allTx, selectedPeriod, rangeDays }) {
 }
 
 // ─── Spending by Category section (Q2) ───────────────────────────────────────
-function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = {} }) {
+function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = {}, onEditTx, onDeleteTx }) {
   const navigate = useNavigate()
-  const [hoveredCat,   setHoveredCat]   = useState(null)
-  const [lockedCat,    setLockedCat]    = useState(null)
-  const [openPopover,  setOpenPopover]  = useState(null) // { name, x, y }
-  const [hoveredBadge, setHoveredBadge] = useState(null) // { name, x, y }
+  const [hoveredCat,     setHoveredCat]     = useState(null)
+  const [lockedCat,      setLockedCat]      = useState(null)
+  const [openPopover,    setOpenPopover]    = useState(null) // { name, x, y }
+  const [hoveredBadge,   setHoveredBadge]   = useState(null) // { name, x, y }
+  const [catExpandedRow, setCatExpandedRow] = useState(null)
   const activeCat = lockedCat ?? hoveredCat
 
   // Click outside the section → deselect locked
@@ -705,18 +706,37 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
               <div className="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1">
                 {catTx.length === 0 ? (
                   <p className="text-[11px] text-center mt-4" style={{ color: 'var(--color-muted-text)' }}>No transactions</p>
-                ) : catTx.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg transition-colors"
-                    style={{}}>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium truncate" style={{ color: 'var(--color-fg)' }}>{t.merchant}</p>
-                      <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</p>
+                ) : catTx.map((t) => {
+                  const txId = t.id ?? t.transaction_id
+                  return (
+                    <div key={txId}>
+                      {catExpandedRow === txId ? (
+                        <TxEditForm
+                          tx={t}
+                          onSave={(updated) => { onEditTx(txId, updated); setCatExpandedRow(null) }}
+                          onDelete={() => { onDeleteTx(txId); setCatExpandedRow(null); setLockedCat(null) }}
+                          onCancel={() => setCatExpandedRow(null)}
+                        />
+                      ) : (
+                        <div
+                          className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg transition-colors cursor-pointer"
+                          style={{}}
+                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          onClick={() => setCatExpandedRow(txId)}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-medium truncate" style={{ color: 'var(--color-fg)' }}>{t.merchant}</p>
+                            <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</p>
+                          </div>
+                          <p className="text-[11px] font-semibold tabular-nums text-red-600 shrink-0">
+                            -${Math.abs(t.amount).toFixed(2)}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-[11px] font-semibold tabular-nums text-red-600 shrink-0">
-                      -${Math.abs(t.amount).toFixed(2)}
-                    </p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               <p className="text-[9px] text-center mt-1.5 shrink-0" style={{ color: 'var(--color-muted-text)' }}>
                 {catTx.length} transaction{catTx.length !== 1 ? 's' : ''}
@@ -878,9 +898,10 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
 }
 
 // ─── Spending by Card section (Q2 alternate) ──────────────────────────────────
-function CardSection({ byCard, totalSpent, transactions, cardColorMap = {} }) {
-  const [hoveredCard, setHoveredCard] = useState(null)
-  const [lockedCard,  setLockedCard]  = useState(null)
+function CardSection({ byCard, totalSpent, transactions, cardColorMap = {}, onEditTx, onDeleteTx }) {
+  const [hoveredCard,    setHoveredCard]    = useState(null)
+  const [lockedCard,     setLockedCard]     = useState(null)
+  const [catExpandedRow, setCatExpandedRow] = useState(null)
   const activeCard = lockedCard ?? hoveredCard
 
   const sectionRef = useRef(null)
@@ -989,17 +1010,37 @@ function CardSection({ byCard, totalSpent, transactions, cardColorMap = {} }) {
               <div className="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1">
                 {cardTx.length === 0 ? (
                   <p className="text-[11px] text-center mt-4" style={{ color: 'var(--color-muted-text)' }}>No transactions</p>
-                ) : cardTx.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium truncate" style={{ color: 'var(--color-fg)' }}>{t.merchant}</p>
-                      <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</p>
+                ) : cardTx.map((t) => {
+                  const txId = t.id ?? t.transaction_id
+                  return (
+                    <div key={txId}>
+                      {catExpandedRow === txId ? (
+                        <TxEditForm
+                          tx={t}
+                          onSave={(updated) => { onEditTx(txId, updated); setCatExpandedRow(null) }}
+                          onDelete={() => { onDeleteTx(txId); setCatExpandedRow(null); setLockedCard(null) }}
+                          onCancel={() => setCatExpandedRow(null)}
+                        />
+                      ) : (
+                        <div
+                          className="flex items-center justify-between gap-2 py-1.5 px-1.5 rounded-lg transition-colors cursor-pointer"
+                          style={{}}
+                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          onClick={() => setCatExpandedRow(txId)}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-medium truncate" style={{ color: 'var(--color-fg)' }}>{t.merchant}</p>
+                            <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-muted-text)' }}>{t.date}</p>
+                          </div>
+                          <p className="text-[11px] font-semibold tabular-nums text-red-600 shrink-0">
+                            -${Math.abs(t.amount).toFixed(2)}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-[11px] font-semibold tabular-nums text-red-600 shrink-0">
-                      -${Math.abs(t.amount).toFixed(2)}
-                    </p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               <p className="text-[9px] text-center mt-1.5 shrink-0" style={{ color: 'var(--color-muted-text)' }}>
                 {cardTx.length} transaction{cardTx.length !== 1 ? 's' : ''}
@@ -1206,11 +1247,27 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
           localNameMap[accountId] = s.custom_name
         })
 
-        // Set transactions with final (override-applied) source names
-        setAllTx(filteredTx.map(t => ({
+        // Fetch manual transactions and merge with Plaid transactions
+        const { data: manualRows } = await supabase
+          .from('manual_transactions')
+          .select('*')
+          .eq('user_id', user.id)
+
+        const manualTx = (manualRows || []).map(r => ({
+          id:       r.id,
+          date:     r.date,
+          merchant: r.merchant,
+          category: r.category,
+          amount:   r.amount,
+          source:   r.source,
+        }))
+
+        const plaidTx = filteredTx.map(t => ({
           ...t,
           source: localNameMap[t.account_id] ?? t.source,
-        })))
+        }))
+
+        setAllTx([...plaidTx, ...manualTx])
         setAccounts(data.accounts ?? [])
         setCardNameMap({ ...localNameMap })
         setCardColorMap({ ...localColorMap })
@@ -1326,16 +1383,30 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     }
   }
 
-  const handleAddExpense = (e) => {
+  const handleAddExpense = async (e) => {
     e.preventDefault()
-    setAllTx(prev => [...prev, {
-      id:       t.transaction_id,
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const newTx = {
+      user_id:  user.id,
       date:     toTxDateStr(fromInputDate(formDate)),
       merchant: formMerchant.trim(),
       category: formCategory,
       amount:   -Math.abs(parseFloat(formAmount)),
       source:   formPayment,
-    }])
+    }
+
+    const { data, error } = await supabase
+      .from('manual_transactions')
+      .insert(newTx)
+      .select()
+      .single()
+
+    if (!error && data) {
+      setAllTx(prev => [...prev, { ...newTx, id: data.id }])
+    }
+
     setShowAddModal(false)
     setFormMerchant(''); setFormAmount('')
     setFormDate(toInputDate(new Date()))
@@ -1670,17 +1741,7 @@ Use all this data to answer questions accurately. If asked about a specific time
           <div className="h-full grid grid-cols-2 grid-rows-2 gap-0">
 
             {/* Q1 — Total Spent */}
-            <Card title="Total Spent"
-              action={
-                <button onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors"
-                  style={{ color: 'var(--color-primary)', cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                  <Plus size={11} /> Add
-                </button>
-              }
-            >
+            <Card title="Total Spent">
               <div className="flex flex-col h-full">
                 {/* Row: date toggle left | big amount + stats right */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -1851,6 +1912,8 @@ Use all this data to answer questions accurately. If asked about a specific time
                   totalSpent={totalSpent}
                   transactions={transactions}
                   budgetLimits={dashBudgets}
+                  onEditTx={(id, updated) => handleEditTx(id, updated)}
+                  onDeleteTx={(id) => handleDeleteTx(id)}
                 />
               ) : (
                 <CardSection
@@ -1858,13 +1921,35 @@ Use all this data to answer questions accurately. If asked about a specific time
                   totalSpent={totalSpent}
                   transactions={transactions}
                   cardColorMap={cardColorMap}
+                  onEditTx={(id, updated) => handleEditTx(id, updated)}
+                  onDeleteTx={(id) => handleDeleteTx(id)}
                 />
               )}
             </Card>
 
             {/* Q3 — Transactions */}
             <Card title="Transactions" divider action={
-              <span className="text-[10px]" style={{ color: 'var(--color-muted-text)' }}>{sortedTx.length} entries</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="text-[10px]" style={{ color: 'var(--color-muted-text)' }}>{sortedTx.length} entries</span>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  style={{
+                    width: 22, height: 22,
+                    borderRadius: 6,
+                    border: '1.5px solid var(--color-border)',
+                    backgroundColor: 'transparent',
+                    color: 'var(--color-primary)',
+                    fontSize: 16,
+                    lineHeight: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  title="Add transaction"
+                >+</button>
+              </div>
             }>
               <div className="flex-1 overflow-y-auto -mx-1 px-1">
                 <table className="w-full text-sm border-separate border-spacing-0">

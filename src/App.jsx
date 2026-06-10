@@ -276,12 +276,18 @@ const inputStyle = {
 }
 
 // ─── Inline transaction edit form ─────────────────────────────────────────────
-function TxEditForm({ tx, onSave, onDelete, onCancel }) {
+function TxEditForm({ tx, onSave, onDelete, onCancel, accounts = [] }) {
   const [date,     setDate]     = useState(toInputDate(parseTxDate(tx.date)))
   const [merchant, setMerchant] = useState(tx.merchant)
   const [category, setCategory] = useState(tx.category)
   const [source,   setSource]   = useState(tx.source)
   const [amount,   setAmount]   = useState(tx.amount.toString())
+
+  const sourceOptions = accounts.length > 0
+    ? accounts
+        .filter(a => !a.hidden)
+        .map(a => ({ value: a.name, label: a.label ?? a.name }))
+    : CARD_OPTIONS.map(o => ({ value: o, label: o }))
 
   const handleSave = (e) => {
     e.preventDefault()
@@ -301,38 +307,42 @@ function TxEditForm({ tx, onSave, onDelete, onCancel }) {
         <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls} style={inputStyle}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {CARD_OPTIONS.map(opt => {
-            const isUnlimited = opt.includes('Unlimited')
-            const isFlex = opt.includes('Flex')
-            const label = isUnlimited ? 'Unlimited' : isFlex ? 'Flex' : 'Other'
-            const bg = opt === source
-              ? (isFlex ? 'hsl(145,22%,82%)' : isUnlimited ? 'hsl(145,28%,72%)' : 'hsl(25,40%,82%)')
-              : 'var(--color-muted-bg)'
-            const color = opt === source
-              ? (isFlex ? 'hsl(145,38%,24%)' : isUnlimited ? 'hsl(145,38%,20%)' : 'hsl(25,55%,35%)')
-              : 'var(--color-muted-text)'
-            return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setSource(opt)}
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: 999,
-                  border: 'none',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: bg,
-                  color,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <select
+            value={source}
+            onChange={e => setSource(e.target.value)}
+            style={{
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              padding: '3px 24px 3px 10px',
+              borderRadius: 999,
+              border: 'none',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              backgroundColor: source?.includes('Unlimited')
+                ? 'hsl(145, 38%, 90%)'
+                : source?.includes('Flex')
+                ? 'hsl(140, 16%, 88%)'
+                : 'var(--color-muted-bg)',
+              color: source?.includes('Unlimited')
+                ? 'hsl(145, 38%, 28%)'
+                : source?.includes('Flex')
+                ? 'hsl(140, 16%, 38%)'
+                : 'var(--color-muted-text)',
+              outline: 'none',
+              minWidth: 80,
+            }}
+          >
+            {sourceOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <span style={{
+            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+            pointerEvents: 'none', fontSize: 9,
+            color: source?.includes('Unlimited') ? 'hsl(145, 38%, 28%)' : source?.includes('Flex') ? 'hsl(140, 16%, 38%)' : 'var(--color-muted-text)',
+          }}>▾</span>
         </div>
         <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
           placeholder="Amount" step="0.01" className={inputCls} style={inputStyle} />
@@ -583,7 +593,7 @@ function TrendsSection({ allTx, selectedPeriod, rangeDays }) {
 }
 
 // ─── Spending by Category section (Q2) ───────────────────────────────────────
-function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = {}, onEditTx, onDeleteTx }) {
+function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = {}, onEditTx, onDeleteTx, accounts = [] }) {
   const navigate = useNavigate()
   const [hoveredCat,     setHoveredCat]     = useState(null)
   const [lockedCat,      setLockedCat]      = useState(null)
@@ -746,6 +756,7 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
                           onSave={(updated) => { onEditTx(txId, updated); setCatExpandedRow(null) }}
                           onDelete={() => { onDeleteTx(txId); setCatExpandedRow(null); setLockedCat(null) }}
                           onCancel={() => setCatExpandedRow(null)}
+                          accounts={accounts}
                         />
                       ) : (
                         <div
@@ -928,7 +939,7 @@ function CategorySection({ byCategory, totalSpent, transactions, budgetLimits = 
 }
 
 // ─── Spending by Card section (Q2 alternate) ──────────────────────────────────
-function CardSection({ byCard, totalSpent, transactions, cardColorMap = {}, onEditTx, onDeleteTx }) {
+function CardSection({ byCard, totalSpent, transactions, cardColorMap = {}, onEditTx, onDeleteTx, accounts = [] }) {
   const [hoveredCard,    setHoveredCard]    = useState(null)
   const [lockedCard,     setLockedCard]     = useState(null)
   const [catExpandedRow, setCatExpandedRow] = useState(null)
@@ -1050,6 +1061,7 @@ function CardSection({ byCard, totalSpent, transactions, cardColorMap = {}, onEd
                           onSave={(updated) => { onEditTx(txId, updated); setCatExpandedRow(null) }}
                           onDelete={() => { onDeleteTx(txId); setCatExpandedRow(null); setLockedCard(null) }}
                           onCancel={() => setCatExpandedRow(null)}
+                          accounts={accounts}
                         />
                       ) : (
                         <div
@@ -1558,6 +1570,21 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     return sortDir === 'asc' ? cmp : -cmp
   }), [transactions, sortCol, sortDir])
 
+  // Enriched account list for source selectors — { name: display name, hidden: bool }
+  const sourceAccounts = useMemo(() =>
+    accountOrder
+      .map(id => ({ name: cardNameMap[id] ?? '', hidden: accountSettings[id]?.hidden ?? false }))
+      .filter(a => a.name),
+    [accountOrder, cardNameMap, accountSettings]
+  )
+
+  // Sync formPayment default once accounts load (in case 'Chase Unlimited' doesn't exist)
+  useEffect(() => {
+    if (sourceAccounts.length > 0 && formPayment === 'Chase Unlimited' && !sourceAccounts.find(a => a.name === 'Chase Unlimited')) {
+      setFormPayment(sourceAccounts.filter(a => !a.hidden)[0]?.name ?? formPayment)
+    }
+  }, [sourceAccounts])   // eslint-disable-line react-hooks/exhaustive-deps
+
   const totalSpent    = transactions.filter(t => t.amount < 0).reduce((s, t) => s + (isNaN(t.amount) ? 0 : Math.abs(t.amount)), 0)
   const purchaseCount = transactions.filter(t => t.amount < 0).length
   const topCategory   = byCategory[0]?.name  ?? '—'
@@ -1944,6 +1971,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                   budgetLimits={dashBudgets}
                   onEditTx={(id, updated) => handleEditTx(id, updated)}
                   onDeleteTx={(id) => handleDeleteTx(id)}
+                  accounts={sourceAccounts}
                 />
               ) : (
                 <CardSection
@@ -1953,6 +1981,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                   cardColorMap={cardColorMap}
                   onEditTx={(id, updated) => handleEditTx(id, updated)}
                   onDeleteTx={(id) => handleDeleteTx(id)}
+                  accounts={sourceAccounts}
                 />
               )}
             </Card>
@@ -2059,6 +2088,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                                   onSave={(updated) => { handleEditTx(t.id, updated); setExpandedRow(null) }}
                                   onDelete={() => { handleDeleteTx(t.id); setExpandedRow(null) }}
                                   onCancel={() => setExpandedRow(null)}
+                                  accounts={sourceAccounts}
                                 />
                               </td>
                             </tr>
@@ -2282,8 +2312,12 @@ Use all this data to answer questions accurately. If asked about a specific time
                 <div>
                   <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-muted-text)' }}>Payment Method</label>
                   <select value={formPayment} onChange={e => setFormPayment(e.target.value)} className={inputCls} style={inputStyle}>
-                    <option value="Chase Unlimited">Chase Unlimited</option>
-                    <option value="Chase Flex">Chase Flex</option>
+                    {(sourceAccounts.length > 0
+                      ? sourceAccounts.filter(a => !a.hidden).map(a => ({ value: a.name, label: a.label ?? a.name }))
+                      : CARD_OPTIONS.map(o => ({ value: o, label: o }))
+                    ).map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>

@@ -1404,11 +1404,16 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
       if (pendingAvatarFile) {
         const path = `${user.id}.jpg`
-        const { error: upErr } = await supabase.storage
+        console.log('uploading file:', pendingAvatarFile.size, pendingAvatarFile.type)
+        const { data: upData, error: upErr } = await supabase.storage
           .from('avatars')
           .upload(path, pendingAvatarFile, { contentType: 'image/jpeg', upsert: true })
-        if (!upErr) {
+        console.log('upload result:', upData, 'error:', upErr)
+        if (upErr) {
+          console.error('UPLOAD FAILED:', upErr.message)
+        } else {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+          console.log('public url:', urlData.publicUrl)
           avatar_url = `${urlData.publicUrl}?t=${Date.now()}`
         }
       }
@@ -2419,20 +2424,27 @@ Use all this data to answer questions accurately. If asked about a specific time
               </button>
               <button
                 onClick={() => {
-                  const canvas = document.createElement('canvas')
-                  canvas.width = 200
-                  canvas.height = 200
-                  const ctx = canvas.getContext('2d')
                   const img = new Image()
                   img.onload = () => {
-                    ctx.drawImage(
-                      img,
-                      100 + cropOffset.x - (img.naturalWidth * cropScale) / 2,
-                      100 + cropOffset.y - (img.naturalHeight * cropScale) / 2,
-                      img.naturalWidth * cropScale,
-                      img.naturalHeight * cropScale
-                    )
+                    const SIZE = 200
+                    const canvas = document.createElement('canvas')
+                    canvas.width = SIZE
+                    canvas.height = SIZE
+                    const ctx = canvas.getContext('2d')
+
+                    ctx.fillStyle = '#ffffff'
+                    ctx.fillRect(0, 0, SIZE, SIZE)
+
+                    const drawW = img.naturalWidth * cropScale
+                    const drawH = img.naturalHeight * cropScale
+                    const dx = SIZE / 2 - drawW / 2 + cropOffset.x
+                    const dy = SIZE / 2 - drawH / 2 + cropOffset.y
+
+                    ctx.drawImage(img, dx, dy, drawW, drawH)
+
                     canvas.toBlob(blob => {
+                      if (!blob) { console.error('toBlob returned null'); return }
+                      console.log('cropped blob size:', blob.size, 'type:', blob.type)
                       const croppedFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
                       setPendingAvatarFile(croppedFile)
                       setCropPreviewUrl(URL.createObjectURL(blob))
@@ -2441,6 +2453,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                       setCropFile(null)
                     }, 'image/jpeg', 0.92)
                   }
+                  img.onerror = () => console.error('crop image failed to load')
                   img.src = cropSrc
                 }}
                 style={{

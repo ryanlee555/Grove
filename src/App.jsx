@@ -1387,7 +1387,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
           ? `${rawAvatar.split('?')[0]}?t=${Date.now()}`
           : ''
         setProfile({ display_name: data.display_name ?? '', avatar_url, hamilton_style: data.hamilton_style ?? 'default' })
-        if (avatar_url) setAvatarUrl(avatar_url)
+        if (data.avatar_url) setAvatarUrl(`${data.avatar_url}?t=${Date.now()}`)
         setSettingName(data.display_name ?? '')
         setSettingStyle(data.hamilton_style ?? 'default')
       }
@@ -1421,8 +1421,10 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
 
-      setAvatarUrl(avatar_url)
-      setProfile(prev => ({ ...prev, display_name: settingName, avatar_url }))
+      const cleanUrl = avatar_url ? avatar_url.split('?')[0] : null
+      const displayUrl = cleanUrl ? `${cleanUrl}?t=${Date.now()}` : null
+      setAvatarUrl(displayUrl)
+      setProfile(prev => ({ ...prev, display_name: settingName, hamilton_style: settingStyle, avatar_url: cleanUrl }))
       setPendingAvatarFile(null)
       setCropPreviewUrl(null)
       setShowSettings(false)
@@ -1797,7 +1799,14 @@ Use all this data to answer questions accurately. If asked about a specific time
                     <p className="text-[13px] font-semibold" style={{ color: 'var(--color-fg)' }}>Pingoo</p>
                     <p className="text-[11px]" style={{ color: 'var(--color-muted-text)' }}>Personal account</p>
                   </div>
-                  <button onClick={() => { setCropPreviewUrl(profile.avatar_url || null); setShowSettings(true); setShowDropdown(false) }} className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
+                  <button onClick={() => {
+                    const url = profile.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : null
+                    setCropPreviewUrl(url)
+                    setSettingName(profile.display_name || '')
+                    setSettingStyle(profile.hamilton_style || 'default')
+                    setShowSettings(true)
+                    setShowDropdown(false)
+                  }} className="w-full text-left px-4 py-2.5 text-[12px] transition-colors hover:opacity-80"
                     style={{ color: 'var(--color-fg)', cursor: 'pointer' }}>Settings</button>
                   <button onClick={handleSignOut} className="w-full text-left px-4 py-2.5 text-[12px] text-red-600 transition-colors hover:opacity-80" style={{ cursor: 'pointer' }}>Sign out</button>
                 </div>

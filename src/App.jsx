@@ -1116,9 +1116,10 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const [showSettings, setShowSettings] = useState(false)
   const [profile, setProfile] = useState({ display_name: '', avatar_url: '', hamilton_style: 'default' })
   const [settingName, setSettingName] = useState('')
-  const [settingAvatar, setSettingAvatar] = useState(null)
   const [settingStyle, setSettingStyle] = useState('default')
   const [settingSaving, setSettingSaving] = useState(false)
+  const [pendingAvatarFile, setPendingAvatarFile] = useState(null)
+  const [avatarUrl,          setAvatarUrl]          = useState(null)
   const [cropSrc,        setCropSrc]        = useState(null)
   const [cropFile,       setCropFile]       = useState(null)
   const [showCropModal,  setShowCropModal]  = useState(false)
@@ -1386,6 +1387,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
           ? `${rawAvatar.split('?')[0]}?t=${Date.now()}`
           : ''
         setProfile({ display_name: data.display_name ?? '', avatar_url, hamilton_style: data.hamilton_style ?? 'default' })
+        if (avatar_url) setAvatarUrl(avatar_url)
         setSettingName(data.display_name ?? '')
         setSettingStyle(data.hamilton_style ?? 'default')
       }
@@ -1398,31 +1400,31 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Determine final avatar URL — upload new file if present, otherwise keep existing
-      let dbAvatarUrl = (profile.avatar_url || '').split('?')[0]  // clean URL for DB
-      let finalAvatarUrl = profile.avatar_url || ''               // cache-busted URL for state
+      let avatar_url = profile.avatar_url ?? null
 
-      if (settingAvatar) {
-        const ext = settingAvatar.name.split('.').pop()
-        const filePath = `${user.id}.${ext}`
-        await supabase.storage.from('avatars').upload(filePath, settingAvatar, { contentType: settingAvatar.type, upsert: true })
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
-        dbAvatarUrl   = urlData.publicUrl
-        finalAvatarUrl = `${dbAvatarUrl}?t=${Date.now()}`
+      if (pendingAvatarFile) {
+        const ext = pendingAvatarFile.name.split('.').pop() || 'jpg'
+        const path = `${user.id}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('avatars')
+          .upload(path, pendingAvatarFile, { contentType: pendingAvatarFile.type, upsert: true })
+        if (!upErr) {
+          const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+          avatar_url = `${urlData.publicUrl}?t=${Date.now()}`
+        }
       }
 
-      // Single upsert with all fields
       await supabase.from('user_profile').upsert({
         user_id: user.id,
         display_name: settingName,
-        avatar_url: dbAvatarUrl,
+        avatar_url: avatar_url ? avatar_url.split('?')[0] : null,
         hamilton_style: settingStyle,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
 
-      // Update top-level state once, after all async work is done
-      setProfile({ display_name: settingName, avatar_url: finalAvatarUrl, hamilton_style: settingStyle })
-      setSettingAvatar(null)
+      setProfile({ display_name: settingName, avatar_url })
+      setAvatarUrl(avatar_url)
+      setPendingAvatarFile(null)
       setCropPreviewUrl(null)
       setShowSettings(false)
     } finally {
@@ -1779,13 +1781,13 @@ Use all this data to answer questions accurately. If asked about a specific time
                 style={{
                   width: 36, height: 36, borderRadius: '50%',
                   overflow: 'hidden', padding: 0, border: 'none', cursor: 'pointer',
-                  backgroundColor: profile.avatar_url ? 'transparent' : 'var(--color-primary)',
+                  backgroundColor: (avatarUrl ?? profile.avatar_url) ? 'transparent' : 'var(--color-primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                {profile.avatar_url
-                  ? <img src={profile.avatar_url} alt="avatar"
+                {(avatarUrl ?? profile.avatar_url)
+                  ? <img src={avatarUrl ?? profile.avatar_url} alt="avatar"
                       style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
-                      onError={() => setProfile(p => ({ ...p, avatar_url: '' }))}
+                      onError={() => setAvatarUrl(null)}
                     />
                   : (profile.display_name?.[0]?.toUpperCase() || 'P')}
               </button>
@@ -2193,13 +2195,13 @@ Use all this data to answer questions accurately. If asked about a specific time
       {/* ── Settings Modal ───────────────────────────────────────────────────── */}
       {showSettings && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          onClick={e => { if (e.target === e.currentTarget) { setSettingAvatar(null); setShowSettings(false) } }}>
+          onClick={e => { if (e.target === e.currentTarget) { setPendingAvatarFile(null); setShowSettings(false) } }}>
           <div className="w-full max-w-md mx-4 rounded-2xl border shadow-2xl flex flex-col"
             style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', maxHeight: '90vh' }}>
             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b shrink-0"
               style={{ borderColor: 'var(--color-border)' }}>
               <h2 className="text-[15px] font-semibold" style={{ color: 'var(--color-fg)', fontFamily: "'Playfair Display', serif" }}>Settings</h2>
-              <button onClick={() => { setSettingAvatar(null); setShowSettings(false) }}
+              <button onClick={() => { setPendingAvatarFile(null); setShowSettings(false) }}
                 className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
                 style={{ color: 'var(--color-muted-text)' }}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
@@ -2247,7 +2249,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                         e.target.value = ''
                       }} />
                     </label>
-                    <button onClick={() => { setSettingAvatar(null); setCropPreviewUrl(null); setProfile(p => ({ ...p, avatar_url: '' })) }}
+                    <button onClick={() => { setPendingAvatarFile(null); setCropPreviewUrl(null); setProfile(p => ({ ...p, avatar_url: '' })) }}
                       className="text-left text-[12px] font-semibold"
                       style={{ color: 'hsl(0, 65%, 50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       Remove
@@ -2299,7 +2301,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                 style={{ backgroundColor: 'var(--color-primary)', opacity: settingSaving ? 0.7 : 1, cursor: settingSaving ? 'default' : 'pointer' }}>
                 {settingSaving ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" onClick={() => { setSettingAvatar(null); setShowSettings(false) }}
+              <button type="button" onClick={() => { setPendingAvatarFile(null); setShowSettings(false) }}
                 className="flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-colors"
                 style={{ borderColor: 'var(--color-border)', color: 'var(--color-fg)', cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
@@ -2427,7 +2429,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                     setCropPreviewUrl(canvas.toDataURL(mimeType, 0.92))
                     canvas.toBlob(blob => {
                       const croppedFile = new File([blob], `avatar.${ext}`, { type: mimeType })
-                      setSettingAvatar(croppedFile)
+                      setPendingAvatarFile(croppedFile)
                       setShowCropModal(false)
                       setCropSrc(null)
                       setCropFile(null)

@@ -1380,7 +1380,12 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       if (!user) return
       const { data } = await supabase.from('user_profile').select('display_name, avatar_url, hamilton_style').eq('user_id', user.id).single()
       if (data) {
-        setProfile({ display_name: data.display_name ?? '', avatar_url: data.avatar_url ?? '', hamilton_style: data.hamilton_style ?? 'default' })
+        const rawAvatar = data.avatar_url ?? ''
+        // FIX 3: always cache-bust on load so a freshly uploaded photo isn't served stale
+        const avatar_url = rawAvatar
+          ? `${rawAvatar.split('?')[0]}?t=${Date.now()}`
+          : ''
+        setProfile({ display_name: data.display_name ?? '', avatar_url, hamilton_style: data.hamilton_style ?? 'default' })
         setSettingName(data.display_name ?? '')
         setSettingStyle(data.hamilton_style ?? 'default')
       }
@@ -1390,6 +1395,10 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
   const handleSaveProfile = async () => {
     setSettingSaving(true)
+    // FIX 1: immediately show local preview in navbar while upload runs
+    if (cropPreviewUrl) {
+      setProfile(p => ({ ...p, avatar_url: cropPreviewUrl }))
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser()
       let avatar_url = profile.avatar_url
@@ -1397,15 +1406,27 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         const ext = settingAvatar.name.split('.').pop()
         await supabase.storage.from('avatars').upload(`${user.id}.${ext}`, settingAvatar, { contentType: settingAvatar.type, upsert: true })
         const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${user.id}.${ext}`)
-        avatar_url = `${urlData.publicUrl}?t=${Date.now()}`
+        // Store clean URL in DB; cache-bust only in memory
+        const cleanUrl = urlData.publicUrl
+        avatar_url = `${cleanUrl}?t=${Date.now()}`
+        // FIX 2: write the new URL to user_profile before updating local state
+        await supabase.from('user_profile').upsert({
+          user_id: user.id,
+          display_name: settingName,
+          avatar_url: cleanUrl,
+          hamilton_style: settingStyle,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+      } else {
+        await supabase.from('user_profile').upsert({
+          user_id: user.id,
+          display_name: settingName,
+          avatar_url: avatar_url.split('?')[0] || avatar_url,
+          hamilton_style: settingStyle,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
       }
-      await supabase.from('user_profile').upsert({
-        user_id: user.id,
-        display_name: settingName,
-        avatar_url,
-        hamilton_style: settingStyle,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' })
+      // Replace any local preview with the real public URL after all awaits complete
       setProfile({ display_name: settingName, avatar_url, hamilton_style: settingStyle })
       setSettingAvatar(null)
       setCropPreviewUrl(null)

@@ -1404,16 +1404,11 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
 
       if (pendingAvatarFile) {
         const path = `${user.id}.jpg`
-        console.log('uploading file:', pendingAvatarFile.size, pendingAvatarFile.type)
-        const { data: upData, error: upErr } = await supabase.storage
+        const { error: upErr } = await supabase.storage
           .from('avatars')
           .upload(path, pendingAvatarFile, { contentType: 'image/jpeg', upsert: true })
-        console.log('upload result:', upData, 'error:', upErr)
-        if (upErr) {
-          console.error('UPLOAD FAILED:', upErr.message)
-        } else {
+        if (!upErr) {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
-          console.log('public url:', urlData.publicUrl)
           avatar_url = `${urlData.publicUrl}?t=${Date.now()}`
         }
       }
@@ -2443,8 +2438,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                     ctx.drawImage(img, dx, dy, drawW, drawH)
 
                     canvas.toBlob(blob => {
-                      if (!blob) { console.error('toBlob returned null'); return }
-                      console.log('cropped blob size:', blob.size, 'type:', blob.type)
+                      if (!blob) return
                       const croppedFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
                       setPendingAvatarFile(croppedFile)
                       setCropPreviewUrl(URL.createObjectURL(blob))
@@ -2453,7 +2447,6 @@ Use all this data to answer questions accurately. If asked about a specific time
                       setCropFile(null)
                     }, 'image/jpeg', 0.92)
                   }
-                  img.onerror = () => console.error('crop image failed to load')
                   img.src = cropSrc
                 }}
                 style={{

@@ -1126,6 +1126,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const [cropOffset,     setCropOffset]     = useState({ x: 0, y: 0 })
   const [cropIsDragging, setCropIsDragging] = useState(false)
   const [cropDragStart,  setCropDragStart]  = useState({ x: 0, y: 0 })
+  const [cropPreviewUrl, setCropPreviewUrl] = useState(null)
   const [hamiltonOpen, setHamiltonOpen] = useState(false)
   const [hamiltonHovered, setHamiltonHovered] = useState(false)
   const [user, setUser] = useState(null)
@@ -1396,7 +1397,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         const ext = settingAvatar.name.split('.').pop()
         await supabase.storage.from('avatars').upload(`${user.id}.${ext}`, settingAvatar, { contentType: settingAvatar.type, upsert: true })
         const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${user.id}.${ext}`)
-        avatar_url = urlData.publicUrl
+        avatar_url = `${urlData.publicUrl}?t=${Date.now()}`
       }
       await supabase.from('user_profile').upsert({
         user_id: user.id,
@@ -1407,6 +1408,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       }, { onConflict: 'user_id' })
       setProfile({ display_name: settingName, avatar_url, hamilton_style: settingStyle })
       setSettingAvatar(null)
+      setCropPreviewUrl(null)
       setShowSettings(false)
     } finally {
       setSettingSaving(false)
@@ -2188,9 +2190,9 @@ Use all this data to answer questions accurately. If asked about a specific time
                 <p className="text-[11px] font-semibold mb-3" style={{ color: 'var(--color-muted-text)' }}>Profile Photo</p>
                 <div className="flex items-center gap-4">
                   <div className="w-[60px] h-[60px] rounded-full overflow-hidden flex items-center justify-center text-[22px] font-bold text-white shrink-0"
-                    style={{ backgroundColor: (settingAvatar || profile.avatar_url) ? 'transparent' : 'var(--color-primary)' }}>
-                    {settingAvatar
-                      ? <img src={URL.createObjectURL(settingAvatar)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    style={{ backgroundColor: (cropPreviewUrl || profile.avatar_url) ? 'transparent' : 'var(--color-primary)' }}>
+                    {cropPreviewUrl
+                      ? <img src={cropPreviewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : profile.avatar_url
                         ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : (settingName?.[0]?.toUpperCase() || 'P')}
@@ -2216,7 +2218,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                         e.target.value = ''
                       }} />
                     </label>
-                    <button onClick={() => { setSettingAvatar(null); setProfile(p => ({ ...p, avatar_url: '' })) }}
+                    <button onClick={() => { setSettingAvatar(null); setCropPreviewUrl(null); setProfile(p => ({ ...p, avatar_url: '' })) }}
                       className="text-left text-[12px] font-semibold"
                       style={{ color: 'hsl(0, 65%, 50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       Remove
@@ -2393,6 +2395,7 @@ Use all this data to answer questions accurately. If asked about a specific time
                     )
                     const mimeType = cropFile.type || 'image/png'
                     const ext = mimeType.split('/')[1] || 'png'
+                    setCropPreviewUrl(canvas.toDataURL(mimeType, 0.92))
                     canvas.toBlob(blob => {
                       const croppedFile = new File([blob], `avatar.${ext}`, { type: mimeType })
                       setSettingAvatar(croppedFile)

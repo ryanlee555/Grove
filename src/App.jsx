@@ -1760,10 +1760,18 @@ Use all this data to answer questions accurately. If asked about a specific time
             </div>
             <div className="relative" ref={dropdownRef}>
               <button onClick={() => setShowDropdown(s => !s)}
-                className="w-9 h-9 flex items-center justify-center rounded-full text-[13px] font-bold text-white transition-colors hover:opacity-90 overflow-hidden"
-                style={{ backgroundColor: profile.avatar_url ? 'transparent' : 'var(--color-primary)', cursor: 'pointer' }}>
+                className="text-[13px] font-bold text-white transition-colors hover:opacity-90"
+                style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  overflow: 'hidden', padding: 0, border: 'none', cursor: 'pointer',
+                  backgroundColor: profile.avatar_url ? 'transparent' : 'var(--color-primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
                 {profile.avatar_url
-                  ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <img src={profile.avatar_url} alt="avatar"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
+                      onError={() => setProfile(p => ({ ...p, avatar_url: '' }))}
+                    />
                   : (profile.display_name?.[0]?.toUpperCase() || 'P')}
               </button>
               {showDropdown && (
@@ -2192,9 +2200,15 @@ Use all this data to answer questions accurately. If asked about a specific time
                   <div className="w-[60px] h-[60px] rounded-full overflow-hidden flex items-center justify-center text-[22px] font-bold text-white shrink-0"
                     style={{ backgroundColor: (cropPreviewUrl || profile.avatar_url) ? 'transparent' : 'var(--color-primary)' }}>
                     {cropPreviewUrl
-                      ? <img src={cropPreviewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <img src={cropPreviewUrl} alt="preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
+                          onError={() => setCropPreviewUrl(null)}
+                        />
                       : profile.avatar_url
-                        ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <img src={profile.avatar_url} alt="avatar"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
+                            onError={() => setProfile(p => ({ ...p, avatar_url: '' }))}
+                          />
                         : (settingName?.[0]?.toUpperCase() || 'P')}
                   </div>
                   <div className="flex flex-col gap-2">

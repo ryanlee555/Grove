@@ -257,7 +257,7 @@ export default function BudgetsPage({ selectedPeriod, setSelectedPeriod }) {
         const ext = settingAvatar.name.split('.').pop()
         await supabase.storage.from('avatars').upload(`${user.id}.${ext}`, settingAvatar, { upsert: true })
         const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${user.id}.${ext}`)
-        avatar_url = urlData.publicUrl
+        avatar_url = `${urlData.publicUrl}?t=${Date.now()}`
       }
       await supabase.from('user_profile').upsert({
         user_id: user.id,
@@ -575,7 +575,10 @@ Use this data to answer the user's questions about their budgets accurately.`
                 overflow: 'hidden',
               }}>
               {profile.avatar_url
-                ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ? <img src={profile.avatar_url} alt="avatar"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
+                    onError={() => setProfile(p => ({ ...p, avatar_url: '' }))}
+                  />
                 : (profile.display_name?.[0]?.toUpperCase() || 'P')}
             </button>
             {showDropdown && (
@@ -819,9 +822,14 @@ Use this data to answer the user's questions about their budgets accurately.`
                   <div className="w-[60px] h-[60px] rounded-full overflow-hidden flex items-center justify-center text-[22px] font-bold text-white shrink-0"
                     style={{ backgroundColor: (settingAvatar || profile.avatar_url) ? 'transparent' : 'var(--color-primary)' }}>
                     {settingAvatar
-                      ? <img src={URL.createObjectURL(settingAvatar)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <img src={URL.createObjectURL(settingAvatar)} alt="preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
+                        />
                       : profile.avatar_url
-                        ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <img src={profile.avatar_url} alt="avatar"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
+                            onError={() => setProfile(p => ({ ...p, avatar_url: '' }))}
+                          />
                         : (settingName?.[0]?.toUpperCase() || 'P')}
                   </div>
                   <div className="flex flex-col gap-2">

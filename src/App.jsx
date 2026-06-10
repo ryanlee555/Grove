@@ -1403,11 +1403,10 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       let avatar_url = profile.avatar_url ?? null
 
       if (pendingAvatarFile) {
-        const ext = pendingAvatarFile.name.split('.').pop() || 'jpg'
-        const path = `${user.id}.${ext}`
+        const path = `${user.id}.jpg`
         const { error: upErr } = await supabase.storage
           .from('avatars')
-          .upload(path, pendingAvatarFile, { contentType: pendingAvatarFile.type, upsert: true })
+          .upload(path, pendingAvatarFile, { contentType: 'image/jpeg', upsert: true })
         if (!upErr) {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
           avatar_url = `${urlData.publicUrl}?t=${Date.now()}`
@@ -1422,8 +1421,8 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
 
-      setProfile({ display_name: settingName, avatar_url })
       setAvatarUrl(avatar_url)
+      setProfile(prev => ({ ...prev, display_name: settingName, avatar_url }))
       setPendingAvatarFile(null)
       setCropPreviewUrl(null)
       setShowSettings(false)
@@ -1781,11 +1780,11 @@ Use all this data to answer questions accurately. If asked about a specific time
                 style={{
                   width: 36, height: 36, borderRadius: '50%',
                   overflow: 'hidden', padding: 0, border: 'none', cursor: 'pointer',
-                  backgroundColor: (avatarUrl ?? profile.avatar_url) ? 'transparent' : 'var(--color-primary)',
+                  backgroundColor: avatarUrl ? 'transparent' : 'var(--color-primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                {(avatarUrl ?? profile.avatar_url)
-                  ? <img src={avatarUrl ?? profile.avatar_url} alt="avatar"
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="avatar"
                       style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }}
                       onError={() => setAvatarUrl(null)}
                     />
@@ -2424,16 +2423,14 @@ Use all this data to answer questions accurately. If asked about a specific time
                       img.naturalWidth * cropScale,
                       img.naturalHeight * cropScale
                     )
-                    const mimeType = cropFile.type || 'image/png'
-                    const ext = mimeType.split('/')[1] || 'png'
-                    setCropPreviewUrl(canvas.toDataURL(mimeType, 0.92))
                     canvas.toBlob(blob => {
-                      const croppedFile = new File([blob], `avatar.${ext}`, { type: mimeType })
+                      const croppedFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
                       setPendingAvatarFile(croppedFile)
+                      setCropPreviewUrl(URL.createObjectURL(blob))
                       setShowCropModal(false)
                       setCropSrc(null)
                       setCropFile(null)
-                    }, mimeType, 0.92)
+                    }, 'image/jpeg', 0.92)
                   }
                   img.src = cropSrc
                 }}

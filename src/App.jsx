@@ -1119,6 +1119,13 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
   const [settingAvatar, setSettingAvatar] = useState(null)
   const [settingStyle, setSettingStyle] = useState('default')
   const [settingSaving, setSettingSaving] = useState(false)
+  const [cropSrc,        setCropSrc]        = useState(null)
+  const [cropFile,       setCropFile]       = useState(null)
+  const [showCropModal,  setShowCropModal]  = useState(false)
+  const [cropScale,      setCropScale]      = useState(1)
+  const [cropOffset,     setCropOffset]     = useState({ x: 0, y: 0 })
+  const [cropIsDragging, setCropIsDragging] = useState(false)
+  const [cropDragStart,  setCropDragStart]  = useState({ x: 0, y: 0 })
   const [hamiltonOpen, setHamiltonOpen] = useState(false)
   const [hamiltonHovered, setHamiltonHovered] = useState(false)
   const [user, setUser] = useState(null)
@@ -1387,7 +1394,7 @@ export default function App({ selectedPeriod, setSelectedPeriod }) {
       let avatar_url = profile.avatar_url
       if (settingAvatar) {
         const ext = settingAvatar.name.split('.').pop()
-        await supabase.storage.from('avatars').upload(`${user.id}.${ext}`, settingAvatar, { upsert: true })
+        await supabase.storage.from('avatars').upload(`${user.id}.${ext}`, settingAvatar, { contentType: settingAvatar.type, upsert: true })
         const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${user.id}.${ext}`)
         avatar_url = urlData.publicUrl
       }
@@ -2196,7 +2203,17 @@ Use all this data to answer questions accurately. If asked about a specific time
                       Upload photo
                       <input type="file" accept="image/*" className="hidden" onChange={e => {
                         const file = e.target.files?.[0]
-                        if (file) setSettingAvatar(file)
+                        if (!file) return
+                        const reader = new FileReader()
+                        reader.onload = ev => {
+                          setCropSrc(ev.target.result)
+                          setCropFile(file)
+                          setCropScale(1)
+                          setCropOffset({ x: 0, y: 0 })
+                          setShowCropModal(true)
+                        }
+                        reader.readAsDataURL(file)
+                        e.target.value = ''
                       }} />
                     </label>
                     <button onClick={() => { setSettingAvatar(null); setProfile(p => ({ ...p, avatar_url: '' })) }}
@@ -2257,6 +2274,145 @@ Use all this data to answer questions accurately. If asked about a specific time
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Crop Photo Modal ─────────────────────────────────────────────────── */}
+      {showCropModal && (
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onMouseMove={e => {
+            if (!cropIsDragging) return
+            setCropOffset({ x: e.clientX - cropDragStart.x, y: e.clientY - cropDragStart.y })
+          }}
+          onMouseUp={() => setCropIsDragging(false)}
+          onTouchMove={e => {
+            if (!cropIsDragging) return
+            const t = e.touches[0]
+            setCropOffset({ x: t.clientX - cropDragStart.x, y: t.clientY - cropDragStart.y })
+          }}
+          onTouchEnd={() => setCropIsDragging(false)}
+        >
+          <div style={{
+            backgroundColor: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 20, padding: 28,
+            width: 320, fontFamily: "'DM Sans', sans-serif",
+            boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+          }}>
+            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 600, color: 'var(--color-fg)', margin: '0 0 20px' }}>
+              Crop Photo
+            </h3>
+
+            {/* Circular preview */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+              <div
+                style={{
+                  width: 200, height: 200, borderRadius: '50%',
+                  overflow: 'hidden', position: 'relative',
+                  backgroundColor: 'var(--color-muted-bg)',
+                  cursor: cropIsDragging ? 'grabbing' : 'grab',
+                  userSelect: 'none', flexShrink: 0,
+                }}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  setCropIsDragging(true)
+                  setCropDragStart({ x: e.clientX - cropOffset.x, y: e.clientY - cropOffset.y })
+                }}
+                onTouchStart={e => {
+                  const t = e.touches[0]
+                  setCropIsDragging(true)
+                  setCropDragStart({ x: t.clientX - cropOffset.x, y: t.clientY - cropOffset.y })
+                }}
+              >
+                {cropSrc && (
+                  <img
+                    src={cropSrc}
+                    alt="crop preview"
+                    draggable={false}
+                    style={{
+                      position: 'absolute',
+                      top: '50%', left: '50%',
+                      transform: `translate(calc(-50% + ${cropOffset.x}px), calc(-50% + ${cropOffset.y}px)) scale(${cropScale})`,
+                      transformOrigin: 'center center',
+                      maxWidth: 'none',
+                      pointerEvents: 'none',
+                      userSelect: 'none',
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Zoom slider */}
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted-text)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Zoom
+              </p>
+              <input
+                type="range" min={1} max={3} step={0.01}
+                value={cropScale}
+                onChange={e => setCropScale(parseFloat(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+              />
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setShowCropModal(false); setCropSrc(null); setCropFile(null) }}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 12,
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'transparent', color: 'var(--color-fg)',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-muted-bg)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const canvas = document.createElement('canvas')
+                  canvas.width = 200
+                  canvas.height = 200
+                  const ctx = canvas.getContext('2d')
+                  const img = new Image()
+                  img.onload = () => {
+                    ctx.drawImage(
+                      img,
+                      100 + cropOffset.x - (img.naturalWidth * cropScale) / 2,
+                      100 + cropOffset.y - (img.naturalHeight * cropScale) / 2,
+                      img.naturalWidth * cropScale,
+                      img.naturalHeight * cropScale
+                    )
+                    const mimeType = cropFile.type || 'image/png'
+                    const ext = mimeType.split('/')[1] || 'png'
+                    canvas.toBlob(blob => {
+                      const croppedFile = new File([blob], `avatar.${ext}`, { type: mimeType })
+                      setSettingAvatar(croppedFile)
+                      setShowCropModal(false)
+                      setCropSrc(null)
+                      setCropFile(null)
+                    }, mimeType, 0.92)
+                  }
+                  img.src = cropSrc
+                }}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 12,
+                  border: 'none', backgroundColor: 'var(--color-primary)',
+                  color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
+                Use Photo
               </button>
             </div>
           </div>

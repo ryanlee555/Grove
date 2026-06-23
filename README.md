@@ -3,6 +3,7 @@
 A personal finance dashboard that connects real bank accounts and gives you an AI assistant to make sense of your spending.
 
 **Live app:** [grovee.vercel.app](https://grovee.vercel.app)
+
 📄 **PRD:** [docs/PRD.md](docs/PRD.md)
 
 ---

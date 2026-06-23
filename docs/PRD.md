@@ -1,4 +1,4 @@
-# Grove: Product Requirements Document
+# Grove: PRD
 
 ## 1. Overview
 
@@ -53,16 +53,6 @@ David is financially organized but curious. He doesn't need help building a budg
 ### Settings and Personalization (Shipped)
 - Profile photo upload with crop and zoom
 - Display name and Hamilton AI style preferences saved per user
-
-### In Progress / Planned
-- Hover-triggered popover showing budget overage details on over-budget categories
-- Default donut chart state showing total spend when no category is hovered or locked
-- Refined drag-to-reorder interaction scoped to account name area only
-- Persistent chat history for Hamilton AI, stored and reloaded across sessions
-- Shared time period state synced between Dashboard and Budgets views
-- Explicit account detection for SoFi to remove reliance on a generic fallback category
-- CSV import for manual transaction entry
-- Spending breakdown by financial institution
 
 ## 6. Technical Architecture
 

@@ -8,22 +8,22 @@ A personal finance dashboard that connects real bank accounts and gives you an A
 
 ## What is Grove?
 
-Grove links directly to your real bank and credit card accounts (currently SoFi + Chase via Plaid) and turns your raw transaction data into a clean, interactive dashboard. You can track spending by category or by card, set monthly budgets with a visual arc-based editor, rename and reorder accounts, and chat with **Hamilton AI**, a built-in assistant that knows your transaction history and can answer questions about your spending in whatever tone you prefer — concise, detailed, hype, or even a roast.
+Grove links directly to your real bank and credit card accounts (currently SoFi + Chase via Plaid) and turns your raw transaction data into a clean, interactive dashboard. You can track spending by category or by card, set monthly budgets with a visual arc-based editor, rename and reorder accounts, and chat with **Hamilton AI**, a built-in assistant that knows your transaction history and can answer questions about your spending in whatever tone you prefer: concise, detailed, hype, or even a roast.
 
-This is a solo-built, full-stack project — from bank integration to backend infrastructure to UI/UX design.
+This is a solo-built, full-stack project, from bank integration to backend infrastructure to UI/UX design.
 
 ---
 
 ## Features
 
-- **Real bank account sync** — Plaid integration pulls live transactions from connected SoFi and Chase accounts
-- **Spending breakdown** — view transactions by category or by card, with a 12-color palette and interactive donut chart
-- **Budgets** — set monthly limits per category with a custom SVG arc-slider editor (drag-to-set, snap-to-$50, amber warning past 80%)
-- **Account management** — rename accounts, hide/show them, and drag-and-drop to reorder
-- **Persistent edits** — manually re-categorize or delete transactions, with changes saved permanently (keyed to Plaid's stable transaction IDs, so they survive future syncs)
-- **Hamilton AI** — a slide-in AI chat assistant with full context on your transaction history and monthly spending, with selectable personality styles (Default / Concise / Detailed / Hype / Roast)
-- **User profiles** — upload and crop a profile photo, set a display name, and choose your Hamilton AI style
-- **Landing page** — feature showcase with an interactive budget demo and live spending breakdown visualization
+- **Real bank account sync** - Plaid integration pulls live transactions from connected SoFi and Chase accounts
+- **Spending breakdown** - view transactions by category or by card, with a 12-color palette and interactive donut chart
+- **Budgets** - set monthly limits per category with a custom SVG arc-slider editor (drag-to-set, snap-to-$50, amber warning past 80%)
+- **Account management** - rename accounts, hide/show them, and drag-and-drop to reorder
+- **Persistent edits** - manually re-categorize or delete transactions, with changes saved permanently (keyed to Plaid's stable transaction IDs, so they survive future syncs)
+- **Hamilton AI** - a slide-in AI chat assistant with full context on your transaction history and monthly spending, with selectable personality styles (Default / Concise / Detailed / Hype / Roast)
+- **User profiles** - upload and crop a profile photo, set a display name, and choose your Hamilton AI style
+- **Landing page** - feature showcase with an interactive budget demo and live spending breakdown visualization
 
 ---
 
@@ -160,13 +160,3 @@ Grove/
 - Row-Level Security (RLS) is enabled on every table; this is the most common source of silent failures (e.g. storage/table 400 errors), so policies are checked carefully whenever new tables are added.
 - The `hamilton-chat` function should validate the `Authorization` JWT header before processing requests.
 - No secrets are committed to the repository — Plaid and Anthropic keys live in environment variables and Edge Function secrets only.
-
----
-
-## About
-
-Grove is built and maintained by [Ryan Lee](https://github.com/ryanlee555), a student at UC Berkeley, as a personal finance tool and portfolio project. It is the product of an iterative, full-stack build spanning bank integrations, backend infrastructure, and custom UI design — including a hand-built SVG arc-slider for budgets and an AI assistant with persistent context on real spending data.
-
-## License
-
-This project is currently unlicensed for public use/distribution. All rights reserved by the author.

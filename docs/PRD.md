@@ -1,4 +1,4 @@
-# Grove: Product Requirements Document
+# Grove: PRD
 
 ## 1. Overview
 
